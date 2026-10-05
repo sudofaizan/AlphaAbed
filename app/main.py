@@ -20,6 +20,16 @@ from app.state import state
 from app.telegram_service import test_telegram, fetch_and_classify
 from app.dual_trade import test_capiffy_connection
 from app.test_trade import test_close_all, test_market_open
+from app.connectivity import (
+    connectivity_loop,
+    record_capiffy,
+    record_mt5,
+    record_telegram,
+    run_connectivity_checks,
+)
+from app.datetime_util import format_card_time_ist
+from app.news_blackout import blackout_status
+from app.news_service import get_news_snapshot, refresh_news_sync
 from app.worker import refresh_history_once, worker_loop
 from signals.alphafx_client import AlphaFxClient, AlphaFxConfig
 from signals.trade_plan import build_trade_plan
@@ -30,6 +40,7 @@ log = logging.getLogger("alphaabed")
 STATIC = Path(__file__).parent / "static"
 _stop: asyncio.Event | None = None
 _worker_task: asyncio.Task | None = None
+_connectivity_task: asyncio.Task | None = None
 
 
 class ConfigUpdate(BaseModel):
@@ -53,6 +64,14 @@ class ConfigUpdate(BaseModel):
     capiffy_volume: Optional[float] = None
     capiffy_symbol: Optional[str] = None
     capiffy_account_id: Optional[str] = None
+    news_calendar_enabled: Optional[bool] = None
+    news_hours_ahead: Optional[int] = None
+    news_impact: Optional[str] = None
+    news_currency: Optional[str] = None
+    news_refresh_sec: Optional[int] = None
+    capiffy_news_blackout: Optional[bool] = None
+    capiffy_news_minutes_before: Optional[int] = None
+    capiffy_news_minutes_after: Optional[int] = None
 
 
 class PreviewBody(BaseModel):
@@ -61,6 +80,10 @@ class PreviewBody(BaseModel):
 
 async def _bootstrap() -> None:
     try:
+        await run_connectivity_checks()
+    except Exception:
+        log.exception("Initial connectivity check failed")
+    try:
         await refresh_history_once()
     except Exception:
         log.exception("Initial history refresh failed")
@@ -68,13 +91,16 @@ async def _bootstrap() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global _stop, _worker_task
+    global _stop, _worker_task, _connectivity_task
     _stop = asyncio.Event()
     asyncio.create_task(_bootstrap())
     _worker_task = asyncio.create_task(worker_loop(_stop))
+    _connectivity_task = asyncio.create_task(connectivity_loop(_stop))
     yield
     if _stop:
         _stop.set()
+    if _connectivity_task:
+        await _connectivity_task
     if _worker_task:
         await _worker_task
 
@@ -95,20 +121,52 @@ async def index():
 
 @app.get("/api/status")
 async def api_status():
+    cfg = load_config()
+    news_blk = blackout_status(cfg)
     with state.lock:
+        tg_at = state.last_telegram_ok_at
+        mt5_at = state.last_mt5_ok_at
+        cap_at = state.last_capiffy_ok_at
+        poll_at = state.last_poll_at
         return {
             "worker_running": state.worker_running,
-            "last_poll_at": state.last_poll_at,
+            "last_poll_at": poll_at,
+            "last_poll_at_ist": format_card_time_ist(poll_at),
             "last_telegram_ok": state.last_telegram_ok,
             "last_telegram_error": state.last_telegram_error,
+            "last_telegram_ok_at": tg_at,
+            "last_telegram_ok_at_ist": format_card_time_ist(tg_at),
             "last_mt5_ok": state.last_mt5_ok,
+            "last_mt5_error": state.last_mt5_error,
+            "last_mt5_ok_at": mt5_at,
+            "last_mt5_ok_at_ist": format_card_time_ist(mt5_at),
             "last_capiffy_ok": state.last_capiffy_ok,
             "last_capiffy_error": state.last_capiffy_error,
+            "last_capiffy_ok_at": cap_at,
+            "last_capiffy_ok_at_ist": format_card_time_ist(cap_at),
+            "health_check_interval_sec": 60,
             "today_pnl": state.today_pnl,
             "account_equity": state.account_equity,
             "last_message_id": state.last_message_id,
-            "config": load_config(),
+            "config": cfg,
+            **news_blk,
         }
+
+
+@app.get("/api/news")
+async def api_news():
+    cfg = load_config()
+    snap = await run_blocking(get_news_snapshot, cfg)
+    blk = blackout_status(cfg)
+    return {**snap, **blk}
+
+
+@app.post("/api/news/refresh")
+async def api_news_refresh():
+    cfg = load_config()
+    snap = await run_blocking(refresh_news_sync, cfg)
+    blk = blackout_status(cfg)
+    return {**snap, **blk}
 
 
 @app.get("/api/config")
@@ -131,9 +189,7 @@ async def put_config(body: ConfigUpdate):
 @app.post("/api/test/telegram")
 async def api_test_telegram():
     result = await test_telegram()
-    with state.lock:
-        state.last_telegram_ok = result.get("ok", False)
-        state.last_telegram_error = result.get("error")
+    record_telegram(bool(result.get("ok")), result.get("error"))
     return result
 
 
@@ -159,9 +215,7 @@ async def api_test_trade_close_all(platform: str = Query("mt5")):
 async def api_test_capiffy():
     cfg = load_config()
     result = await run_blocking(test_capiffy_connection, cfg)
-    with state.lock:
-        state.last_capiffy_ok = result.get("ok", False)
-        state.last_capiffy_error = result.get("error")
+    record_capiffy(bool(result.get("ok")), result.get("error"))
     return result
 
 
@@ -179,12 +233,8 @@ async def api_test_mt5():
     account = await run_blocking(client.account_health)
     price = await run_blocking(client.get_price)
     ok = bool(health.get("ok")) and bool(account.get("ok"))
-    with state.lock:
-        state.last_mt5_ok = ok
-        if account.get("ok"):
-            today = account.get("today") or {}
-            state.today_pnl = today.get("closed_pl")
-            state.account_equity = account.get("equity")
+    err = None if ok else (health.get("error") or account.get("error"))
+    record_mt5(ok, err, account if account.get("ok") else None)
     return {"ok": ok, "health": health, "account": account, "price": price}
 
 

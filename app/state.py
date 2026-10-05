@@ -13,9 +13,13 @@ class RuntimeState:
     last_poll_at: str | None = None
     last_telegram_ok: bool | None = None
     last_telegram_error: str | None = None
+    last_telegram_ok_at: str | None = None
     last_mt5_ok: bool | None = None
+    last_mt5_error: str | None = None
+    last_mt5_ok_at: str | None = None
     last_capiffy_ok: bool | None = None
     last_capiffy_error: str | None = None
+    last_capiffy_ok_at: str | None = None
     today_pnl: float | None = None
     account_equity: float | None = None
     signal_history: list[dict[str, Any]] = field(default_factory=list)

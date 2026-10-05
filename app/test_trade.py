@@ -92,6 +92,16 @@ def test_close_all(cfg: dict, platform: str = "mt5") -> dict[str, Any]:
     except ValueError as exc:
         return {"ok": False, "error": str(exc)}
 
+    if platform.lower() == "capiffy":
+        return {
+            "ok": False,
+            "action": "test_close_all",
+            "platform": platform,
+            "error": "Capiffy close is not supported — close positions on capiffy.com (MT5 only here).",
+        }
+
+    eff["trade_capiffy"] = False
+    eff["capiffy_enabled"] = False
     result = close_all_parallel(eff)
     return {
         "ok": bool(result.get("ok")),

@@ -7,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable, Optional
 
 from app.capiffy import client as capiffy_client
+from app.news_blackout import capiffy_news_blackout
 from signals.alphafx_client import AlphaFxClient, AlphaFxConfig
 from signals.trade_plan import TradePlan
 
@@ -81,6 +82,7 @@ def open_market_parallel(
     side_cap = "BUY" if plan.side == "buy" else "SELL"
 
     jobs: list[tuple[str, Callable[[], Any]]] = []
+    legs: dict[str, Any] = {}
 
     if should_trade_mt5(cfg):
 
@@ -96,29 +98,53 @@ def open_market_parallel(
 
         jobs.append(("mt5", _mt5))
 
+    cap_blocked = False
+    cap_block_reason = ""
     if should_trade_capiffy(cfg):
+        blocked, reason, _ev = capiffy_news_blackout(cfg)
+        if blocked:
+            cap_blocked = True
+            cap_block_reason = reason
+            legs["capiffy"] = {
+                "ok": False,
+                "skipped": True,
+                "news_blackout": True,
+                "error": reason,
+            }
+        else:
 
-        def _cap() -> Any:
-            return capiffy_client.open_position(
-                symbol=cap_sym,
-                side=side_cap,
-                volume=cap_vol,
-                stop_loss=plan.sl,
-                take_profit=plan.tp,
-                cfg=cfg,
-            )
+            def _cap() -> Any:
+                return capiffy_client.open_position(
+                    symbol=cap_sym,
+                    side=side_cap,
+                    volume=cap_vol,
+                    stop_loss=plan.sl,
+                    take_profit=plan.tp,
+                    cfg=cfg,
+                )
 
-        jobs.append(("capiffy", _cap))
+            jobs.append(("capiffy", _cap))
 
-    legs = _run_parallel(jobs)
-    ok = all(leg.get("ok") for leg in legs.values()) if legs else False
-    return {"ok": ok, "legs": legs, "plan": plan.__dict__}
+    parallel = _run_parallel(jobs)
+    legs.update(parallel)
+    ok_parts = [leg.get("ok") for leg in legs.values() if not leg.get("skipped")]
+    ok = all(ok_parts) if ok_parts else (not jobs and not cap_blocked)
+    if cap_blocked and legs.get("mt5", {}).get("ok"):
+        ok = True
+    out: dict[str, Any] = {"ok": ok, "legs": legs, "plan": plan.__dict__}
+    if cap_blocked:
+        out["capiffy_news_blackout"] = cap_block_reason
+    return out
 
 
 def close_all_parallel(cfg: dict) -> dict[str, Any]:
+    """Close MT5 only — Capiffy positions must be closed manually on capiffy.com."""
     comment = (cfg.get("mt5_trade_comment") or "ABD").strip()[:31]
-    cap_sym = capiffy_symbol_from_cfg(cfg)
     jobs: list[tuple[str, Callable[[], Any]]] = []
+    capiffy_note: Optional[str] = None
+
+    if should_trade_capiffy(cfg):
+        capiffy_note = "Capiffy close skipped (AlphaAbed opens only; close on Capiffy UI)"
 
     if should_trade_mt5(cfg):
 
@@ -127,16 +153,12 @@ def close_all_parallel(cfg: dict) -> dict[str, Any]:
 
         jobs.append(("mt5", _mt5))
 
-    if should_trade_capiffy(cfg):
-
-        def _cap() -> Any:
-            return capiffy_client.close_all_symbol(cap_sym, cfg=cfg)
-
-        jobs.append(("capiffy", _cap))
-
     legs = _run_parallel(jobs)
     ok = all(leg.get("ok") for leg in legs.values()) if legs else False
-    return {"ok": ok, "legs": legs}
+    out: dict[str, Any] = {"ok": ok, "legs": legs}
+    if capiffy_note:
+        out["capiffy_note"] = capiffy_note
+    return out
 
 
 def partial_close_mt5(cfg: dict, volume: float) -> dict[str, Any]:

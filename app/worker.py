@@ -14,6 +14,8 @@ from app.telegram_service import (
     poll_new_messages,
     run_realtime_listener,
 )
+from app.connectivity import record_mt5, record_telegram
+from app.execution_tags import summarize_trade_execution
 from app.trading import process_signal_row
 from signals.alphafx_client import AlphaFxClient, AlphaFxConfig
 
@@ -29,16 +31,15 @@ async def refresh_account_metrics(cfg: dict) -> None:
         )
     )
     health = await run_blocking(client.account_health)
-    with state.lock:
-        state.last_mt5_ok = bool(health.get("ok"))
-        if health.get("ok"):
-            today = health.get("today") or {}
-            state.today_pnl = today.get("closed_pl")
-            state.account_equity = health.get("equity")
+    ok = bool(health.get("ok"))
+    err = health.get("error") if not ok else None
+    record_mt5(ok, err, health if ok else None)
 
 
 async def _handle_row(row: dict, cfg: dict) -> None:
     trade = await process_signal_row(row, cfg)
+    if trade and trade.get("action") != "skipped":
+        row["execution"] = summarize_trade_execution(trade, cfg)
     kinds = cfg.get("signal_kinds_history") or []
     with state.lock:
         if row["kind"] in kinds:
@@ -60,8 +61,7 @@ async def worker_loop(stop_event: asyncio.Event) -> None:
         await _handle_row(row, cfg)
         with state.lock:
             state.last_poll_at = datetime.now(timezone.utc).isoformat()
-            state.last_telegram_ok = True
-            state.last_telegram_error = None
+        record_telegram(True, None)
 
     while not stop_event.is_set():
         cfg = load_config()
@@ -79,13 +79,11 @@ async def worker_loop(stop_event: asyncio.Event) -> None:
             await refresh_account_metrics(cfg)
             with state.lock:
                 state.last_poll_at = datetime.now(timezone.utc).isoformat()
-                state.last_telegram_ok = True
-                state.last_telegram_error = None
+            if not realtime:
+                record_telegram(True, None)
         except Exception as e:
             log.exception("Worker cycle error")
-            with state.lock:
-                state.last_telegram_ok = False
-                state.last_telegram_error = str(e)
+            record_telegram(False, str(e))
 
         wait = poll_sec if not realtime else acct_sec
         try:

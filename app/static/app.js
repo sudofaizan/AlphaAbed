@@ -32,6 +32,42 @@ function fmtPnl(v) {
   return `${sign}${n.toFixed(2)}`;
 }
 
+function renderExecutionFoot(execution) {
+  if (!execution) return "";
+  const tags = execution.tags || [];
+  const errors = execution.errors || [];
+  if (!tags.length && !errors.length) return "";
+
+  const tagHtml = tags
+    .map((t) => {
+      const cls =
+        t.status === "success"
+          ? "tag-ok"
+          : t.status === "failed"
+            ? "tag-fail"
+            : t.status === "skipped"
+              ? "tag-skipped"
+              : "tag-na";
+      const title = t.detail ? ` title="${escapeHtml(t.detail)}"` : "";
+      const suffix =
+        t.status === "success"
+          ? " ✓"
+          : t.status === "failed"
+            ? " ✗"
+            : t.status === "skipped"
+              ? " ⊘"
+              : "";
+      return `<span class="exec-tag ${cls}"${title}>${escapeHtml(t.label)}${suffix}</span>`;
+    })
+    .join("");
+
+  const errHtml = errors.length
+    ? `<div class="exec-errors">${errors.map((e) => escapeHtml(e)).join("<br/>")}</div>`
+    : "";
+
+  return `<div class="signal-foot">${errHtml}<div class="exec-tags">${tagHtml}</div></div>`;
+}
+
 function renderSignals(signals) {
   const el = document.getElementById("signalList");
   if (!signals.length) {
@@ -44,11 +80,13 @@ function renderSignals(signals) {
       const rr = plan
         ? `<div class="rr">R:R ${plan.reward_risk_ratio} · entry ${plan.entry} SL ${plan.sl} TP ${plan.tp} · risk ${plan.risk_points} pts</div>`
         : "";
+      const foot = renderExecutionFoot(s.execution);
       return `<article class="signal-item">
         <div><span class="kind">${s.kind}</span> · id ${s.message_id} · ${escapeHtml(s.date_ist || formatMessageDateIST(s.date))}</div>
         <div>${s.summary}</div>
         ${rr}
         <pre>${escapeHtml(s.raw_text)}</pre>
+        ${foot}
       </article>`;
     })
     .join("");
@@ -58,28 +96,108 @@ function escapeHtml(t) {
   return t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+function setStatusCard(badgeId, lastOkId, ok, offLabel, errorText, lastOkIst) {
+  const badge = document.getElementById(badgeId);
+  const lastEl = document.getElementById(lastOkId);
+  if (lastEl) lastEl.textContent = lastOkIst || "—";
+  if (!badge) return;
+  if (ok === null || ok === undefined) {
+    badge.textContent = offLabel || "Off";
+    badge.className = "badge";
+    return;
+  }
+  if (ok) {
+    badge.textContent = "OK";
+    badge.className = "badge ok";
+  } else {
+    badge.textContent = errorText || "Failed";
+    badge.className = "badge bad";
+    badge.title = errorText || "";
+  }
+}
+
 async function loadStatus() {
   const s = await api("/api/status");
   document.getElementById("todayPnl").textContent = fmtPnl(s.today_pnl);
   document.getElementById("equity").textContent = s.account_equity ?? "—";
-  document.getElementById("lastPoll").textContent = s.last_poll_at ?? "—";
+  document.getElementById("lastPoll").textContent =
+    s.last_poll_at_ist || formatMessageDateIST(s.last_poll_at);
   document.getElementById("lastMsgId").textContent = s.last_message_id ?? "—";
 
-  const tg = document.getElementById("tgStatus");
-  tg.textContent = s.last_telegram_ok ? "OK" : s.last_telegram_error || "Unknown";
-  tg.className = "badge " + (s.last_telegram_ok ? "ok" : "bad");
+  setStatusCard(
+    "tgStatus",
+    "tgLastOk",
+    s.last_telegram_ok,
+    null,
+    s.last_telegram_error || "Check",
+    s.last_telegram_ok_at_ist
+  );
+  setStatusCard(
+    "mt5Status",
+    "mt5LastOk",
+    s.last_mt5_ok,
+    null,
+    s.last_mt5_error || "Check",
+    s.last_mt5_ok_at_ist
+  );
+  const capEnabled = s.config && s.config.capiffy_enabled;
+  setStatusCard(
+    "capiffyStatus",
+    "capiffyLastOk",
+    capEnabled ? s.last_capiffy_ok : null,
+    "Off",
+    s.last_capiffy_error || "Check",
+    capEnabled ? s.last_capiffy_ok_at_ist : null
+  );
 
-  const mt5 = document.getElementById("mt5Status");
-  mt5.textContent = s.last_mt5_ok ? "OK" : "Check connection";
-  mt5.className = "badge " + (s.last_mt5_ok ? "ok" : "bad");
-
-  const cap = document.getElementById("capiffyStatus");
-  if (cap) {
-    cap.textContent = s.last_capiffy_ok ? "OK" : s.last_capiffy_error || "Not tested";
-    cap.className = "badge " + (s.last_capiffy_ok ? "ok" : "bad");
-  }
-
+  updateNewsBlackoutBanner(s);
   fillForm(s.config);
+}
+
+function updateNewsBlackoutBanner(s) {
+  const el = document.getElementById("newsBlackoutBanner");
+  if (!el) return;
+  if (s.capiffy_blackout_active && s.capiffy_blackout_reason) {
+    el.textContent = "⚠ " + s.capiffy_blackout_reason;
+    el.classList.remove("hidden");
+  } else {
+    el.classList.add("hidden");
+    el.textContent = "";
+  }
+}
+
+function renderNews(data) {
+  const list = document.getElementById("newsList");
+  const at = document.getElementById("newsFetchedAt");
+  if (at) at.textContent = data.fetched_at_ist || data.fetched_at || "—";
+  if (!list) return;
+  if (!data.ok && data.error) {
+    list.innerHTML = `<li class="muted">News error: ${escapeHtml(data.error)}</li>`;
+    return;
+  }
+  const events = data.events || [];
+  if (!events.length) {
+    list.innerHTML = "<li class='muted'>No high-impact USD news in window.</li>";
+    return;
+  }
+  list.innerHTML = events
+    .map((e) => {
+      const mins = e.minutes_until != null ? `${e.minutes_until}m` : "—";
+      const fp = [e.forecast, e.previous].filter((x) => x && x !== "—").join(" / ");
+      const meta = fp ? `F/P: ${escapeHtml(fp)} · in ${mins}` : `in ${mins}`;
+      return `<li>
+        <span class="news-time">${escapeHtml(e.time_ist || e.time || "—")}</span>
+        <span class="news-title">📕 ${escapeHtml(e.currency || "USD")} ${escapeHtml(e.title || "")}</span>
+        <span class="news-meta">${meta}</span>
+      </li>`;
+    })
+    .join("");
+}
+
+async function loadNews() {
+  const data = await api("/api/news");
+  renderNews(data);
+  updateNewsBlackoutBanner(data);
 }
 
 function fillForm(cfg) {
@@ -121,6 +239,12 @@ function renderCurrentSettings(cfg) {
     ["Capiffy lot", cfg.capiffy_volume ?? "—"],
     ["Capiffy symbol", cfg.capiffy_symbol ?? "—"],
     ["Capiffy account id", cfg.capiffy_account_id || "(from .env)"],
+    ["News calendar", yn(cfg.news_calendar_enabled !== false)],
+    ["Capiffy news blackout", yn(cfg.capiffy_news_blackout !== false)],
+    [
+      "Capiffy blackout ±min",
+      `${cfg.capiffy_news_minutes_before ?? 30} / ${cfg.capiffy_news_minutes_after ?? 30}`,
+    ],
     ["Order comment", cfg.mt5_trade_comment ?? "ABD"],
     ["Reward : risk (TP)", cfg.reward_risk_ratio ?? "—"],
     ["Use signal TP", yn(cfg.prefer_signal_tp)],
@@ -254,6 +378,12 @@ document.getElementById("btnTestMt5").addEventListener("click", async () => {
   loadStatus();
 });
 
+document.getElementById("btnRefreshNews").addEventListener("click", async () => {
+  const r = await api("/api/news/refresh", { method: "POST" });
+  renderNews(r);
+  updateNewsBlackoutBanner(r);
+});
+
 document.getElementById("btnRefreshSignals").addEventListener("click", async () => {
   const r = await api("/api/signals/refresh", { method: "POST" });
   if (!r.ok) {
@@ -275,6 +405,7 @@ async function pollUi() {
     .map((e) => `<li>[${e.kind}] ${escapeHtml(e.message || "")}</li>`)
     .join("");
   await loadStatus();
+  await loadNews();
 }
 
 pollUi();

@@ -74,6 +74,18 @@ class AlphaFxClient:
         sym = symbol or self.cfg.symbol
         return self._request("GET", "/getPrice", query={"symbol": sym})
 
+    def get_upcoming_news(
+        self,
+        *,
+        hours: int = 72,
+        impact: str = "High",
+        currency: str | None = "USD",
+    ) -> dict:
+        query: dict[str, str | int] = {"hours": hours, "impact": impact}
+        if currency:
+            query["currency"] = currency
+        return self._request("GET", "/getUpcomingNews", query=query)
+
     def place_order(
         self,
         *,
