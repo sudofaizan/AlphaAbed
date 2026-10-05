@@ -3,137 +3,117 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>AlphaAbed — Signal Dashboard</title>
-  <link rel="stylesheet" href="/static/style.css" />
+  <title>XAUBeast — ALPHAFX</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Rajdhani:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/style.css?v=7" />
 </head>
 <body>
-  <header>
-    <h1>AlphaAbed</h1>
-    <p class="sub">Abeid FX Telegram → MT5 + Capiffy (parallel when enabled)</p>
-  </header>
-
-  <section class="cards">
-    <div class="card">
-      <h2>Today P/L</h2>
-      <p id="todayPnl" class="big">—</p>
-      <p class="muted">Equity: <span id="equity">—</span></p>
+  <div id="loginGate" class="login-gate">
+    <div class="login-panel glass">
+      <h2 class="login-title">XAUBeast</h2>
+      <p class="muted">Enter access key to unlock ALPHAFX</p>
+      <form id="loginForm">
+        <label>Password<input id="loginPassword" type="password" autocomplete="current-password" autofocus /></label>
+        <button type="submit" class="btn-neon">Unlock</button>
+      </form>
+      <p id="loginError" class="login-error"></p>
     </div>
-    <div class="card status-card">
-      <h2>Telegram</h2>
-      <p id="tgStatus" class="badge">—</p>
-      <p class="muted card-last-ok">Last OK: <span id="tgLastOk">—</span></p>
-      <button type="button" id="btnTestTg">Test fetch</button>
-    </div>
-    <div class="card status-card">
-      <h2>MT5 API</h2>
-      <p id="mt5Status" class="badge">—</p>
-      <p class="muted card-last-ok">Last OK: <span id="mt5LastOk">—</span></p>
-      <button type="button" id="btnTestMt5">Test connection</button>
-    </div>
-    <div class="card status-card">
-      <h2>Capiffy</h2>
-      <p id="capiffyStatus" class="badge">—</p>
-      <p class="muted card-last-ok">Last OK: <span id="capiffyLastOk">—</span></p>
-      <button type="button" id="btnTestCapiffy">Test connection</button>
-    </div>
-    <div class="card">
-      <h2>Worker</h2>
-      <p class="muted">Last poll: <span id="lastPoll">—</span></p>
-      <p class="muted">Last msg id: <span id="lastMsgId">—</span></p>
-    </div>
-  </section>
+  </div>
 
-  <section class="panel panel-compact">
-    <p class="muted">Dual platform: opens on MT5 + Capiffy in parallel when enabled. Capiffy tokens in <code>.env</code>; lots/toggles in settings. Capiffy is <strong>open-only</strong> (close on capiffy.com).</p>
-  </section>
-
-  <section class="panel" id="newsPanel">
-    <div class="row">
-      <h2>USD red-folder news</h2>
-      <button type="button" id="btnRefreshNews">Refresh</button>
-    </div>
-    <p id="newsBlackoutBanner" class="news-blackout hidden"></p>
-    <p class="muted">High-impact USD from MT5 <code>/getUpcomingNews</code>. Capiffy opens blocked ±30m (configurable); MT5 still trades.</p>
-    <p class="muted">Updated: <span id="newsFetchedAt">—</span></p>
-    <ul id="newsList" class="news-list"></ul>
-  </section>
-
-  <section class="panel">
-    <h2>Test trades (live)</h2>
-    <p class="muted warn-text">Real orders. MT5 test lot 0.01; Capiffy uses Capiffy lot from settings. SL/TP from default SL points + R:R.</p>
-    <fieldset class="platform-toggle">
-      <legend>Send test order to</legend>
-      <label><input type="radio" name="testPlatform" value="mt5" checked /> MT5 only</label>
-      <label><input type="radio" name="testPlatform" value="capiffy" /> Capiffy only</label>
-      <label><input type="radio" name="testPlatform" value="both" /> Both (parallel)</label>
-    </fieldset>
-    <div class="btn-row">
-      <button type="button" id="btnTestBuy" class="btn-buy">Test BUY</button>
-      <button type="button" id="btnTestSell" class="btn-sell">Test SELL</button>
-      <button type="button" id="btnTestCloseAll" class="btn-close">Close all</button>
-    </div>
-    <pre id="testTradeResult" class="test-result muted">—</pre>
-  </section>
-
-  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
-
-  <section class="panel">
-    <h2>Current saved settings</h2>
-    <p class="muted">Values loaded from server (<code>data/config.json</code>). Updates after save.</p>
-    <dl id="currentSettings" class="settings-summary"></dl>
-    <p id="settingsSavedAt" class="muted settings-saved-at"></p>
-  </section>
-
-  <section class="panel">
-    <h2>Edit settings</h2>
-    <form id="cfgForm" class="grid">
-      <label>Poll interval (sec, if realtime off)<input name="poll_interval_sec" type="number" min="1" step="1" /></label>
-      <label>Account / P&amp;L refresh (sec)<input name="account_refresh_sec" type="number" min="1" step="1" /></label>
-      <label class="check"><input name="telegram_realtime" type="checkbox" /> Telegram instant push (recommended)</label>
-      <label>MT5 base URL<input name="mt5_base_url" type="text" placeholder="http://15.135.71.95:8080" /></label>
-      <label>API key<input name="mt5_api_key" type="text" /></label>
-      <label>Symbol<input name="mt5_symbol" type="text" placeholder="XAUUSD.pr" /></label>
-      <label>Order comment (MT5)<input name="mt5_trade_comment" type="text" maxlength="31" placeholder="ABD" /></label>
-      <label>MT5 lot size<input name="volume" type="number" step="0.01" min="0.01" /></label>
-      <label class="check"><input name="trade_mt5" type="checkbox" /> Auto-trade on MT5</label>
-      <label class="check"><input name="capiffy_enabled" type="checkbox" /> Capiffy enabled</label>
-      <label class="check"><input name="trade_capiffy" type="checkbox" /> Auto-trade on Capiffy (parallel with MT5)</label>
-      <label>Capiffy lot size<input name="capiffy_volume" type="number" step="0.01" min="0.01" /></label>
-      <label>Capiffy symbol<input name="capiffy_symbol" type="text" placeholder="XAUUSD" /></label>
-      <label>Capiffy account id (optional if in .env)<input name="capiffy_account_id" type="text" placeholder="" /></label>
-      <label class="check"><input name="news_calendar_enabled" type="checkbox" /> Show red-folder news calendar</label>
-      <label>News lookahead (hours)<input name="news_hours_ahead" type="number" min="1" max="168" /></label>
-      <label>News impact filter<input name="news_impact" type="text" placeholder="High" /></label>
-      <label>News currency<input name="news_currency" type="text" placeholder="USD" /></label>
-      <label class="check"><input name="capiffy_news_blackout" type="checkbox" /> Block Capiffy opens around red news</label>
-      <label>Minutes before news (Capiffy)<input name="capiffy_news_minutes_before" type="number" min="0" max="120" /></label>
-      <label>Minutes after news (Capiffy)<input name="capiffy_news_minutes_after" type="number" min="0" max="120" /></label>
-      <label>Reward : Risk (TP)<input name="reward_risk_ratio" type="number" step="0.1" min="0.5" /></label>
-      <label>Fetch limit (history)<input name="telegram_fetch_limit" type="number" min="10" max="500" /></label>
-      <label>Default SL (points, no SL in msg)<input name="default_sl_points" type="number" min="0" /></label>
-      <label class="check"><input name="prefer_signal_tp" type="checkbox" /> Use TP from message when present</label>
-      <label class="check"><input name="allow_trade_without_sl" type="checkbox" /> Trade without SL (use default points)</label>
-      <label class="check warn"><input name="auto_trade" type="checkbox" /> Auto-trade live orders</label>
-      <div class="actions">
-        <button type="submit">Save settings</button>
+  <div id="appShell" class="hidden">
+    <header class="top-bar">
+      <div class="brand-block">
+        <h1>XAUBeast <span class="brand-tag">ALPHAFX</span></h1>
+        <p class="sub">Abeid FX Telegram → MT5 + Capiffy</p>
       </div>
-    </form>
-  </section>
+      <nav class="top-nav">
+        <a href="/" class="nav-link active">Dashboard</a>
+        <a href="/settings" class="nav-link">Settings</a>
+        <button type="button" id="btnLogout" class="nav-link nav-btn">Lock</button>
+      </nav>
+    </header>
 
-  <section class="panel">
-    <div class="row">
-      <h2>Signal history (sorted from last N messages)</h2>
-      <button type="button" id="btnRefreshSignals">Refresh last 100</button>
-    </div>
-    <p class="muted">Only trade-related messages (signals, close, incomplete, SL fragments). Promos and chat hidden. New live signals show <strong>MT5</strong> / <strong>CAPIFY</strong> tags when auto-trade runs (Capiffy: open only — close MT5 manually on Capiffy).</p>
-    <div id="signalList" class="signal-list"></div>
-  </section>
+    <section class="cards">
+      <div class="card glass">
+        <h2>Today P/L</h2>
+        <p id="todayPnl" class="big neon-text">—</p>
+        <p class="muted">Equity: <span id="equity">—</span></p>
+      </div>
+      <div class="card glass status-card">
+        <h2>Telegram</h2>
+        <p id="tgStatus" class="badge">—</p>
+        <p class="muted card-last-ok">Last OK: <span id="tgLastOk">—</span></p>
+        <button type="button" id="btnTestTg" class="btn-neon-sm">Test fetch</button>
+      </div>
+      <div class="card glass status-card">
+        <h2>MT5 API</h2>
+        <p id="mt5Status" class="badge">—</p>
+        <p class="muted card-last-ok">Last OK: <span id="mt5LastOk">—</span></p>
+        <button type="button" id="btnTestMt5" class="btn-neon-sm">Test connection</button>
+      </div>
+      <div class="card glass status-card">
+        <h2>Capiffy</h2>
+        <p id="capiffyStatus" class="badge">—</p>
+        <p class="muted card-last-ok">Last OK: <span id="capiffyLastOk">—</span></p>
+        <button type="button" id="btnTestCapiffy" class="btn-neon-sm">Test connection</button>
+      </div>
+      <div class="card glass">
+        <h2>Worker</h2>
+        <p class="muted">Last poll: <span id="lastPoll">—</span></p>
+        <p class="muted">Last msg id: <span id="lastMsgId">—</span></p>
+      </div>
+    </section>
 
-  <section class="panel">
-    <h2>Live events</h2>
-    <ul id="eventLog" class="event-log"></ul>
-  </section>
+    <section class="panel glass panel-compact">
+      <p class="muted">Dual platform: parallel opens when enabled. Capiffy <strong>open-only</strong> — configure lots &amp; news rules in <a href="/settings">Settings</a>.</p>
+    </section>
 
-  <script src="/static/app.js?v=6"></script>
+    <section class="panel glass" id="newsPanel">
+      <div class="row">
+        <h2>USD red-folder news</h2>
+        <button type="button" id="btnRefreshNews" class="btn-neon-sm">Refresh</button>
+      </div>
+      <p id="newsBlackoutBanner" class="news-blackout hidden"></p>
+      <p class="muted">Updated: <span id="newsFetchedAt">—</span></p>
+      <ul id="newsList" class="news-list"></ul>
+    </section>
+
+    <section class="panel glass">
+      <h2>Test trades (live)</h2>
+      <p class="muted warn-text">Real orders. MT5 0.01 lot; Capiffy uses settings lot.</p>
+      <fieldset class="platform-toggle">
+        <legend>Send test order to</legend>
+        <label><input type="radio" name="testPlatform" value="mt5" checked /> MT5 only</label>
+        <label><input type="radio" name="testPlatform" value="capiffy" /> Capiffy only</label>
+        <label><input type="radio" name="testPlatform" value="both" /> Both (parallel)</label>
+      </fieldset>
+      <div class="btn-row">
+        <button type="button" id="btnTestBuy" class="btn-buy">Test BUY</button>
+        <button type="button" id="btnTestSell" class="btn-sell">Test SELL</button>
+        <button type="button" id="btnTestCloseAll" class="btn-close">Close all</button>
+      </div>
+      <pre id="testTradeResult" class="test-result muted">—</pre>
+    </section>
+
+    <section class="panel glass">
+      <div class="row">
+        <h2>Signal history</h2>
+        <button type="button" id="btnRefreshSignals" class="btn-neon-sm">Refresh last 100</button>
+      </div>
+      <div id="signalList" class="signal-list"></div>
+    </section>
+
+    <section class="panel glass">
+      <h2>Live events</h2>
+      <ul id="eventLog" class="event-log"></ul>
+    </section>
+  </div>
+
+  <div id="toast" class="toast hidden" role="status"></div>
+  <script src="/static/auth.js?v=1"></script>
+  <script src="/static/common.js?v=1"></script>
+  <script src="/static/app.js?v=7"></script>
 </body>
 </html>

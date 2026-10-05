@@ -8,10 +8,11 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Optional
 
-from fastapi import FastAPI, Query
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, Query, Request
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.async_io import run_blocking
 from app.config_store import load_config, save_config
@@ -30,6 +31,7 @@ from app.connectivity import (
 from app.datetime_util import format_card_time_ist
 from app.news_blackout import blackout_status
 from app.news_service import get_news_snapshot, refresh_news_sync
+from app.ui_auth import create_session, revoke_session, verify_password, verify_session
 from app.worker import refresh_history_once, worker_loop
 from signals.alphafx_client import AlphaFxClient, AlphaFxConfig
 from signals.trade_plan import build_trade_plan
@@ -78,6 +80,23 @@ class PreviewBody(BaseModel):
     text: str
 
 
+class LoginBody(BaseModel):
+    password: str
+
+
+class AuthMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        path = request.url.path
+        if path.startswith("/api/") and path not in ("/api/login",):
+            token = request.headers.get("X-XAUBeast-Token")
+            if not verify_session(token):
+                return JSONResponse(
+                    {"ok": False, "error": "unauthorized — unlock dashboard"},
+                    status_code=401,
+                )
+        return await call_next(request)
+
+
 async def _bootstrap() -> None:
     try:
         await run_connectivity_checks()
@@ -105,18 +124,46 @@ async def lifespan(app: FastAPI):
         await _worker_task
 
 
-app = FastAPI(title="AlphaAbed", lifespan=lifespan)
+app = FastAPI(title="XAUBeast - ALPHAFX", lifespan=lifespan)
+app.add_middleware(AuthMiddleware)
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 
 @app.get("/health")
 async def health():
-    return {"ok": True, "service": "alphaabed"}
+    return {"ok": True, "service": "xaubeast-alphafx"}
 
 
 @app.get("/")
 async def index():
     return FileResponse(STATIC / "index.html")
+
+
+@app.get("/settings")
+async def settings_page():
+    return FileResponse(STATIC / "settings.html")
+
+
+@app.post("/api/login")
+async def api_login(body: LoginBody):
+    if not verify_password(body.password):
+        return JSONResponse({"ok": False, "error": "Invalid password"}, status_code=401)
+    token = create_session()
+    return {"ok": True, "token": token}
+
+
+@app.get("/api/session")
+async def api_session(request: Request):
+    token = request.headers.get("X-XAUBeast-Token")
+    if verify_session(token):
+        return {"ok": True}
+    return JSONResponse({"ok": False}, status_code=401)
+
+
+@app.post("/api/logout")
+async def api_logout(request: Request):
+    revoke_session(request.headers.get("X-XAUBeast-Token"))
+    return {"ok": True}
 
 
 @app.get("/api/status")

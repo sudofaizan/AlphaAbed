@@ -144,7 +144,7 @@ def close_all_parallel(cfg: dict) -> dict[str, Any]:
     capiffy_note: Optional[str] = None
 
     if should_trade_capiffy(cfg):
-        capiffy_note = "Capiffy close skipped (AlphaAbed opens only; close on Capiffy UI)"
+        capiffy_note = "Capiffy close skipped (XAUBeast opens only; close on Capiffy UI)"
 
     if should_trade_mt5(cfg):
 

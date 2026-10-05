@@ -1,5 +1,5 @@
 [Unit]
-Description=AlphaAbed web dashboard + Telegram signal automation
+Description=XAUBeast - ALPHAFX web dashboard + Telegram signal automation
 After=network-online.target
 Wants=network-online.target
 

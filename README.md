@@ -1,4 +1,6 @@
-# AlphaAbed — Telegram channel watcher
+# XAUBeast — ALPHAFX
+
+Telegram channel watcher & trading dashboard (repo folder: AlphaAbed).
 
 Python tools to read and watch **one Telegram channel** with your account ([Telethon](https://docs.telethon.dev/)).
 

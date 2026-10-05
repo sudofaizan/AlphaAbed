@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Settings — XAUBeast ALPHAFX</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Rajdhani:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div id="loginGate" class="login-gate">
+    <div class="login-panel glass">
+      <h2 class="login-title">XAUBeast</h2>
+      <p class="muted">Enter access key to unlock ALPHAFX</p>
+      <form id="loginForm">
+        <label>Password<input id="loginPassword" type="password" autocomplete="current-password" autofocus /></label>
+        <button type="submit" class="btn-neon">Unlock</button>
+      </form>
+      <p id="loginError" class="login-error"></p>
+    </div>
+  </div>
+
+  <div id="appShell" class="hidden">
+    <header class="top-bar">
+      <div class="brand-block">
+        <h1>XAUBeast <span class="brand-tag">ALPHAFX</span></h1>
+        <p class="sub">System configuration</p>
+      </div>
+      <nav class="top-nav">
+        <a href="/" class="nav-link">Dashboard</a>
+        <a href="/settings" class="nav-link active">Settings</a>
+        <button type="button" id="btnLogout" class="nav-link nav-btn">Lock</button>
+      </nav>
+    </header>
+
+    <section class="panel glass">
+      <h2>Current saved settings</h2>
+      <p class="muted">Persisted to <code>data/config.json</code></p>
+      <dl id="currentSettings" class="settings-summary"></dl>
+      <p id="settingsSavedAt" class="muted settings-saved-at"></p>
+    </section>
+
+    <section class="panel glass">
+      <h2>Edit settings</h2>
+      <form id="cfgForm" class="grid">
+        <label>Poll interval (sec, if realtime off)<input name="poll_interval_sec" type="number" min="1" step="1" /></label>
+        <label>Account / P&amp;L refresh (sec)<input name="account_refresh_sec" type="number" min="1" step="1" /></label>
+        <label class="check"><input name="telegram_realtime" type="checkbox" /> Telegram instant push</label>
+        <label>MT5 base URL<input name="mt5_base_url" type="text" /></label>
+        <label>API key<input name="mt5_api_key" type="text" /></label>
+        <label>Symbol<input name="mt5_symbol" type="text" /></label>
+        <label>Order comment (MT5)<input name="mt5_trade_comment" type="text" maxlength="31" /></label>
+        <label>MT5 lot size<input name="volume" type="number" step="0.01" min="0.01" /></label>
+        <label class="check"><input name="trade_mt5" type="checkbox" /> Auto-trade on MT5</label>
+        <label class="check"><input name="capiffy_enabled" type="checkbox" /> Capiffy enabled</label>
+        <label class="check"><input name="trade_capiffy" type="checkbox" /> Auto-trade on Capiffy</label>
+        <label>Capiffy lot size<input name="capiffy_volume" type="number" step="0.01" min="0.01" /></label>
+        <label>Capiffy symbol<input name="capiffy_symbol" type="text" /></label>
+        <label>Capiffy account id<input name="capiffy_account_id" type="text" /></label>
+        <label class="check"><input name="news_calendar_enabled" type="checkbox" /> Red-folder news calendar</label>
+        <label>News lookahead (hours)<input name="news_hours_ahead" type="number" min="1" max="168" /></label>
+        <label>News impact filter<input name="news_impact" type="text" /></label>
+        <label>News currency<input name="news_currency" type="text" /></label>
+        <label class="check"><input name="capiffy_news_blackout" type="checkbox" /> Block Capiffy around red news</label>
+        <label>Minutes before news<input name="capiffy_news_minutes_before" type="number" min="0" max="120" /></label>
+        <label>Minutes after news<input name="capiffy_news_minutes_after" type="number" min="0" max="120" /></label>
+        <label>Reward : Risk (TP)<input name="reward_risk_ratio" type="number" step="0.1" min="0.5" /></label>
+        <label>Fetch limit (history)<input name="telegram_fetch_limit" type="number" min="10" max="500" /></label>
+        <label>Default SL (points)<input name="default_sl_points" type="number" min="0" /></label>
+        <label class="check"><input name="prefer_signal_tp" type="checkbox" /> Use TP from message</label>
+        <label class="check"><input name="allow_trade_without_sl" type="checkbox" /> Trade without SL (default points)</label>
+        <label class="check warn"><input name="auto_trade" type="checkbox" /> Auto-trade live orders</label>
+        <div class="actions">
+          <button type="submit" class="btn-neon">Save settings</button>
+        </div>
+      </form>
+    </section>
+  </div>
+
+  <div id="toast" class="toast hidden" role="status"></div>
+  <script src="/static/auth.js?v=1"></script>
+  <script src="/static/common.js?v=1"></script>
+  <script src="/static/settings.js?v=1"></script>
+</body>
+</html>
