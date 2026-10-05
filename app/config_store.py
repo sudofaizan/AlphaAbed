@@ -6,6 +6,7 @@ import json
 import os
 import threading
 from copy import deepcopy
+from datetime import datetime, timezone
 from pathlib import Path
 
 DEFAULTS = {
@@ -51,6 +52,13 @@ def load_config() -> dict:
             return deepcopy(DEFAULTS)
         merged = deepcopy(DEFAULTS)
         merged.update(data)
+        if "config_saved_at" not in merged and _path.exists():
+            try:
+                merged["config_saved_at"] = datetime.fromtimestamp(
+                    _path.stat().st_mtime, tz=timezone.utc
+                ).isoformat()
+            except OSError:
+                pass
         return merged
 
 
@@ -61,5 +69,7 @@ def save_config(updates: dict) -> dict:
             if key in DEFAULTS:
                 cfg[key] = val
         _ensure_dir()
+        saved_at = datetime.now(timezone.utc).isoformat()
+        cfg["config_saved_at"] = saved_at
         _path.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
         return cfg

@@ -65,6 +65,57 @@ function fillForm(cfg) {
     if (input.type === "checkbox") input.checked = !!v;
     else input.value = v;
   }
+  renderCurrentSettings(cfg);
+}
+
+function yn(v) {
+  return v ? "Yes" : "No";
+}
+
+function maskKey(key) {
+  if (!key) return "—";
+  const s = String(key);
+  if (s.length <= 4) return "****";
+  return s.slice(0, 2) + "…" + s.slice(-2);
+}
+
+function renderCurrentSettings(cfg) {
+  if (!cfg) return;
+  const rows = [
+    ["Telegram realtime", yn(cfg.telegram_realtime)],
+    ["Poll interval (sec)", cfg.poll_interval_sec ?? "—"],
+    ["Account refresh (sec)", cfg.account_refresh_sec ?? "—"],
+    ["Auto-trade", yn(cfg.auto_trade)],
+    ["MT5 URL", cfg.mt5_base_url ?? "—"],
+    ["API key", maskKey(cfg.mt5_api_key)],
+    ["Symbol", cfg.mt5_symbol ?? "—"],
+    ["Lot size", cfg.volume ?? "—"],
+    ["Order comment", cfg.mt5_trade_comment ?? "ABD"],
+    ["Reward : risk (TP)", cfg.reward_risk_ratio ?? "—"],
+    ["Use signal TP", yn(cfg.prefer_signal_tp)],
+    ["Trade without SL", yn(cfg.allow_trade_without_sl)],
+    ["Default SL points", cfg.default_sl_points ?? "—"],
+    ["History fetch limit", cfg.telegram_fetch_limit ?? "—"],
+  ];
+  document.getElementById("currentSettings").innerHTML = rows
+    .map(
+      ([label, val]) =>
+        `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(String(val))}</dd></div>`
+    )
+    .join("");
+  const at = cfg.config_saved_at;
+  document.getElementById("settingsSavedAt").textContent = at
+    ? `Last saved (UTC): ${at}`
+    : "Not saved yet — using defaults until you click Save settings.";
+}
+
+let toastTimer;
+function showToast(message, type = "ok") {
+  const el = document.getElementById("toast");
+  el.textContent = message;
+  el.className = "toast " + (type === "ok" ? "ok" : "err");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.add("hidden"), 4500);
 }
 
 document.getElementById("cfgForm").addEventListener("submit", async (e) => {
@@ -77,9 +128,23 @@ document.getElementById("cfgForm").addEventListener("submit", async (e) => {
     else if (el.type === "number") body[el.name] = Number(el.value);
     else body[el.name] = el.value;
   }
-  await api("/api/config", { method: "PUT", body: JSON.stringify(body) });
-  await loadStatus();
-  alert("Settings saved.");
+  const btn = form.querySelector('button[type="submit"]');
+  btn.disabled = true;
+  try {
+    const r = await api("/api/config", { method: "PUT", body: JSON.stringify(body) });
+    if (r.ok !== false && r.config) {
+      fillForm(r.config);
+      renderCurrentSettings(r.config);
+      showToast(r.message || "Settings saved successfully.", "ok");
+    } else {
+      showToast("Could not save settings.", "err");
+    }
+    await loadStatus();
+  } catch (err) {
+    showToast("Save failed — check connection.", "err");
+  } finally {
+    btn.disabled = false;
+  }
 });
 
 document.getElementById("btnTestTg").addEventListener("click", async () => {

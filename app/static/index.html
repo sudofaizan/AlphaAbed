@@ -46,8 +46,17 @@
     <pre id="testTradeResult" class="test-result muted">—</pre>
   </section>
 
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
   <section class="panel">
-    <h2>Settings</h2>
+    <h2>Current saved settings</h2>
+    <p class="muted">Values loaded from server (<code>data/config.json</code>). Updates after save.</p>
+    <dl id="currentSettings" class="settings-summary"></dl>
+    <p id="settingsSavedAt" class="muted settings-saved-at"></p>
+  </section>
+
+  <section class="panel">
+    <h2>Edit settings</h2>
     <form id="cfgForm" class="grid">
       <label>Poll interval (sec, if realtime off)<input name="poll_interval_sec" type="number" min="1" step="1" /></label>
       <label>Account / P&amp;L refresh (sec)<input name="account_refresh_sec" type="number" min="1" step="1" /></label>

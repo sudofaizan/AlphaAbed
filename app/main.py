@@ -109,7 +109,13 @@ async def get_config():
 @app.put("/api/config")
 async def put_config(body: ConfigUpdate):
     updates = {k: v for k, v in body.model_dump().items() if v is not None}
-    return save_config(updates)
+    cfg = save_config(updates)
+    return {
+        "ok": True,
+        "message": "Settings saved successfully.",
+        "config": cfg,
+        "saved_at": cfg.get("config_saved_at"),
+    }
 
 
 @app.post("/api/test/telegram")
