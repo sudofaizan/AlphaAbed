@@ -6,6 +6,25 @@ async function api(path, opts = {}) {
   return r.json();
 }
 
+function formatMessageDateIST(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return String(iso);
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  }).formatToParts(d);
+  const get = (type) => parts.find((p) => p.type === type)?.value ?? "";
+  const ampm = get("dayPeriod").toUpperCase();
+  return `${get("year")}-${get("month")}-${get("day")} ${get("hour")}:${get("minute")}:${get("second")} ${ampm} IST`;
+}
+
 function fmtPnl(v) {
   if (v == null || Number.isNaN(v)) return "—";
   const n = Number(v);
@@ -151,9 +170,13 @@ document.getElementById("cfgForm").addEventListener("submit", async (e) => {
     }
     await loadStatus();
   } catch (err) {
-    showToast("Save failed — check connection.", "err");
+    showToast(
+      err.name === "AbortError" ? "Save timed out — try again." : "Save failed — check connection.",
+      "err"
+    );
   } finally {
     btn.disabled = false;
+    btn.textContent = prevLabel;
   }
 });
 
