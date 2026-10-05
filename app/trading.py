@@ -29,11 +29,8 @@ def _process_signal_row_sync(row: dict[str, Any], cfg: dict) -> dict[str, Any] |
             kind = "open_signal"
 
     if kind == "incomplete_signal" and parsed.signal and parsed.signal.sl is None:
-        if cfg.get("allow_trade_without_sl"):
-            kind = "open_signal"
-        else:
-            _pending = parsed.signal
-            return None
+        _pending = parsed.signal
+        return None
 
     if kind not in ("open_signal", "close_all", "partial_close"):
         return None
@@ -70,10 +67,8 @@ def _process_signal_row_sync(row: dict[str, Any], cfg: dict) -> dict[str, Any] |
         return None
 
     signal = parsed.signal
-    if signal.sl is None and not cfg.get("allow_trade_without_sl"):
-        return {"action": "skipped", "reason": "no SL in message"}
     if signal.sl is None and not cfg.get("default_sl_points"):
-        return {"action": "skipped", "reason": "no SL and no default_sl_points"}
+        return {"action": "skipped", "reason": "no SL in message and no default_sl_points"}
 
     price = client.get_price()
     if not price.get("ok"):
@@ -82,7 +77,7 @@ def _process_signal_row_sync(row: dict[str, Any], cfg: dict) -> dict[str, Any] |
     bid = float(price["bid"])
     ask = float(price["ask"])
     point = float(price.get("point") or 0.01)
-    default_sl = float(cfg["default_sl_points"]) if cfg.get("allow_trade_without_sl") else None
+    default_sl = float(cfg["default_sl_points"]) if signal.sl is None else None
 
     plan = build_trade_plan(
         signal,

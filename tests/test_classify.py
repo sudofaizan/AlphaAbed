@@ -33,8 +33,9 @@ class TestClassify(unittest.TestCase):
         s = parse_trade_signal(t)
         assert s
         self.assertEqual(s.side, "buy")
+        self.assertTrue(s.market)
         p = classify_text(t)
-        self.assertEqual(p.kind, "incomplete_signal")
+        self.assertEqual(p.kind, "open_signal")
 
     def test_close_all(self):
         self.assertEqual(classify_text("Closing all.").kind, "close_all")

@@ -137,16 +137,10 @@ def parse_trade_signal(text: str) -> TradeSignal | None:
     sl, tp = _parse_levels(text)
     if side and not symbol and sl is not None:
         symbol = "XAUUSD"
-    if not side:
+    if not side or not symbol:
         return None
-    if not symbol:
-        return None
-    entry, entry_min, entry_max, market = _parse_entry(text)
-    if entry is None and entry_min is None and not market:
-        if sl is not None:
-            market = True
-        else:
-            return None
+    # Entry / NOW / AT / FROM are parsed for display only; execution is always market.
+    entry, entry_min, entry_max, _ = _parse_entry(text)
     return TradeSignal(
         side=side,
         symbol=symbol,
@@ -155,7 +149,7 @@ def parse_trade_signal(text: str) -> TradeSignal | None:
         entry_max=entry_max,
         sl=sl,
         tp=tp,
-        market=market,
+        market=True,
     )
 
 
@@ -197,22 +191,16 @@ def classify_text(text: str) -> ParsedMessage:
 
     signal = parse_trade_signal(text)
     if signal:
-        if signal.sl is None and not signal.market and signal.entry is None and signal.entry_min is None:
-            return ParsedMessage(
-                kind="incomplete_signal",
-                signal=signal,
-                reason="side/symbol without SL or entry",
-                raw_text=text,
-            )
+        note = "market"
         if signal.sl is None:
-            return ParsedMessage(
-                kind="incomplete_signal",
-                signal=signal,
-                reason="missing SL (can use default SL points if configured)",
-                raw_text=text,
-            )
+            note += ", default SL if missing"
+        if signal.tp is None:
+            note += ", default TP if missing"
         return ParsedMessage(
-            kind="open_signal", signal=signal, reason="actionable trade", raw_text=text
+            kind="open_signal",
+            signal=signal,
+            reason=f"BUY/SELL ({note})",
+            raw_text=text,
         )
 
     if _RE_SIDE.search(text) and _RE_XAU.search(text):
@@ -235,18 +223,10 @@ def format_signal_line(parsed: ParsedMessage, message_id: int | None = None) -> 
     prefix = f"id={message_id} " if message_id is not None else ""
     if parsed.kind == "open_signal" and parsed.signal:
         s = parsed.signal
-        entry = s.entry
-        if s.entry_min is not None and s.entry_max is not None:
-            entry_str = f"{s.entry_min}-{s.entry_max}"
-        elif s.market and entry is None:
-            entry_str = "MARKET"
-        elif entry is not None:
-            entry_str = str(entry)
-        else:
-            entry_str = "?"
-        tp = s.tp if s.tp is not None else "-"
+        sl = s.sl if s.sl is not None else "default"
+        tp = s.tp if s.tp is not None else "default"
         return (
-            f"{prefix}[OPEN] {s.side.upper()} {s.symbol} @ {entry_str} "
-            f"SL {s.sl} TP {tp}"
+            f"{prefix}[OPEN] {s.side.upper()} {s.symbol} MARKET "
+            f"SL {sl} TP {tp}"
         )
     return f"{prefix}[{parsed.kind.upper()}] {parsed.reason}"
