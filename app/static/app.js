@@ -45,7 +45,7 @@ function renderSignals(signals) {
         ? `<div class="rr">R:R ${plan.reward_risk_ratio} · entry ${plan.entry} SL ${plan.sl} TP ${plan.tp} · risk ${plan.risk_points} pts</div>`
         : "";
       return `<article class="signal-item">
-        <div><span class="kind">${s.kind}</span> · id ${s.message_id} · ${s.date}</div>
+        <div><span class="kind">${s.kind}</span> · id ${s.message_id} · ${escapeHtml(s.date_ist || formatMessageDateIST(s.date))}</div>
         <div>${s.summary}</div>
         ${rr}
         <pre>${escapeHtml(s.raw_text)}</pre>

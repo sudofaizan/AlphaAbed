@@ -10,6 +10,7 @@ from typing import Any
 
 from app.async_io import run_blocking
 from app.config_store import load_config
+from app.datetime_util import format_message_time_ist
 
 from telethon import events
 from telethon.errors import ChannelInvalidError, ChannelPrivateError, UsernameInvalidError
@@ -30,11 +31,13 @@ SIGNAL_KINDS = {
 
 
 def _msg_record(message, body: str) -> dict[str, Any]:
-    when = message.date.replace(tzinfo=timezone.utc).isoformat()
+    when_dt = message.date.replace(tzinfo=timezone.utc)
+    when = when_dt.isoformat()
     parsed = classify_text(body)
     return {
         "message_id": message.id,
         "date": when,
+        "date_ist": format_message_time_ist(when_dt),
         "kind": parsed.kind,
         "summary": format_signal_line(parsed, message.id),
         "raw_text": body,

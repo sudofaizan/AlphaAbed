@@ -15,6 +15,7 @@ from pydantic import BaseModel
 
 from app.async_io import run_blocking
 from app.config_store import load_config, save_config
+from app.datetime_util import enrich_date_ist
 from app.state import state
 from app.telegram_service import test_telegram, fetch_and_classify
 from app.test_trade import test_close_all, test_market_open
@@ -181,13 +182,17 @@ async def api_account():
 
 @app.post("/api/signals/refresh")
 async def api_signals_refresh():
-    return await refresh_history_once()
+    result = await refresh_history_once()
+    if result.get("signals"):
+        result["signals"] = [enrich_date_ist(s) for s in result["signals"]]
+    return result
 
 
 @app.get("/api/signals/history")
 async def api_signals_history():
     with state.lock:
-        return {"signals": list(state.signal_history), "count": len(state.signal_history)}
+        signals = [enrich_date_ist(s) for s in state.signal_history]
+        return {"signals": signals, "count": len(signals)}
 
 
 @app.get("/api/events")
