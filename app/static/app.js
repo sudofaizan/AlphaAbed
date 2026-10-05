@@ -129,9 +129,19 @@ document.getElementById("cfgForm").addEventListener("submit", async (e) => {
     else body[el.name] = el.value;
   }
   const btn = form.querySelector('button[type="submit"]');
+  const prevLabel = btn.textContent;
   btn.disabled = true;
+  btn.textContent = "Saving…";
   try {
-    const r = await api("/api/config", { method: "PUT", body: JSON.stringify(body) });
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 15000);
+    const r = await fetch("/api/config", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: ctrl.signal,
+    }).then((res) => res.json());
+    clearTimeout(t);
     if (r.ok !== false && r.config) {
       fillForm(r.config);
       renderCurrentSettings(r.config);
