@@ -33,13 +33,21 @@ python watch_channel.py
 
 ### Headless session (for EC2)
 
-On a machine where you can enter the Telegram login code:
+Amazon Linux has **`python3`**, not `python`. From the repo directory:
 
 ```bash
-python login_session.py
+cp .env.example .env   # set API_ID and API_HASH first
+chmod +x login.sh
+./login.sh
 ```
 
-Copy the printed `SESSION_STRING=...` into `.env` on the server.
+Or, if `venv` already exists:
+
+```bash
+./venv/bin/python login_session.py
+```
+
+Copy the printed `SESSION_STRING=...` into `.env`, then run `./deploy_ec2.sh`.
 
 ## Deploy on Amazon Linux (EC2)
 

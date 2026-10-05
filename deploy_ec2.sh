@@ -51,7 +51,7 @@ python3 -m venv "${APP_DIR}/venv"
 "${APP_DIR}/venv/bin/pip" install -r "${APP_DIR}/requirements.txt"
 
 if ! grep -qE '^SESSION_STRING=.+' "${APP_DIR}/.env" && [[ ! -f "${APP_DIR}/telegram_session.session" ]]; then
-  die "No Telegram session. On a machine with a terminal run login_session.py, add SESSION_STRING to .env, then re-run deploy."
+  die "No Telegram session. Run: chmod +x login.sh && ./login.sh — paste SESSION_STRING into .env, then re-run deploy."
 fi
 
 log "Installing systemd unit (${UNIT_PATH})..."
