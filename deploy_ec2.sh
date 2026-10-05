@@ -85,8 +85,8 @@ $SUDO systemctl restart "${SERVICE_NAME}"
 log "Done. Status:"
 $SUDO systemctl --no-pager status "${SERVICE_NAME}" || true
 
-sleep 2
-if curl -sf -m 5 "http://127.0.0.1:${WEB_PORT}/health" >/dev/null; then
+sleep 4
+if curl -sf -m 10 "http://127.0.0.1:${WEB_PORT}/health" >/dev/null; then
   PUB="$(curl -sf -m 2 http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || echo YOUR_EC2_IP)"
   log "Dashboard OK: http://${PUB}:${WEB_PORT}/"
   log "Open EC2 security group: inbound TCP ${WEB_PORT}"

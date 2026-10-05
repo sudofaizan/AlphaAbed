@@ -6,7 +6,7 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
@@ -29,17 +29,17 @@ _worker_task: asyncio.Task | None = None
 
 
 class ConfigUpdate(BaseModel):
-    poll_interval_sec: int | None = None
-    mt5_base_url: str | None = None
-    mt5_api_key: str | None = None
-    mt5_symbol: str | None = None
-    volume: float | None = None
-    reward_risk_ratio: float | None = None
-    prefer_signal_tp: bool | None = None
-    auto_trade: bool | None = None
-    allow_trade_without_sl: bool | None = None
-    default_sl_points: float | None = None
-    telegram_fetch_limit: int | None = None
+    poll_interval_sec: Optional[int] = None
+    mt5_base_url: Optional[str] = None
+    mt5_api_key: Optional[str] = None
+    mt5_symbol: Optional[str] = None
+    volume: Optional[float] = None
+    reward_risk_ratio: Optional[float] = None
+    prefer_signal_tp: Optional[bool] = None
+    auto_trade: Optional[bool] = None
+    allow_trade_without_sl: Optional[bool] = None
+    default_sl_points: Optional[float] = None
+    telegram_fetch_limit: Optional[int] = None
 
 
 class PreviewBody(BaseModel):
