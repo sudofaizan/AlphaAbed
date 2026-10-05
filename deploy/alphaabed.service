@@ -9,9 +9,14 @@ User=__SERVICE_USER__
 Group=__SERVICE_USER__
 WorkingDirectory=__APP_DIR__
 EnvironmentFile=__APP_DIR__/.env
-ExecStart=__APP_DIR__/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 80
-Restart=on-failure
-RestartSec=10
+Environment=PYTHONUNBUFFERED=1
+# Bind port 80 as non-root (Amazon Linux systemd)
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+NoNewPrivileges=yes
+ExecStart=__APP_DIR__/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port __WEB_PORT__
+Restart=always
+RestartSec=5
 StandardOutput=journal
 StandardError=journal
 

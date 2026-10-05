@@ -46,14 +46,18 @@ class PreviewBody(BaseModel):
     text: str
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    global _stop, _worker_task
-    _stop = asyncio.Event()
+async def _bootstrap() -> None:
     try:
         await refresh_history_once()
     except Exception:
         log.exception("Initial history refresh failed")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global _stop, _worker_task
+    _stop = asyncio.Event()
+    asyncio.create_task(_bootstrap())
     _worker_task = asyncio.create_task(worker_loop(_stop))
     yield
     if _stop:
@@ -64,6 +68,11 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="AlphaAbed", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
+
+
+@app.get("/health")
+async def health():
+    return {"ok": True, "service": "alphaabed"}
 
 
 @app.get("/")

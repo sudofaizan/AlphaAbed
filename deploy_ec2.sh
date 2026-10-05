@@ -61,11 +61,16 @@ if [[ -n "${PYBIN}" && -f "${PYBIN}" ]]; then
     log "Note: setcap failed — open port 80 in security group; you may need sudo / nginx proxy."
 fi
 
+WEB_PORT="$(grep -E '^WEB_PORT=' "${APP_DIR}/.env" 2>/dev/null | cut -d= -f2- | tr -d '\r' || true)"
+WEB_PORT="${WEB_PORT:-8080}"
+log "Web dashboard port: ${WEB_PORT} (set WEB_PORT=80 in .env for port 80)"
+
 log "Installing systemd unit (${UNIT_PATH})..."
 TMP_UNIT="$(mktemp)"
 sed \
   -e "s|__SERVICE_USER__|${SERVICE_USER}|g" \
   -e "s|__APP_DIR__|${APP_DIR}|g" \
+  -e "s|__WEB_PORT__|${WEB_PORT}|g" \
   "${APP_DIR}/deploy/alphaabed.service" > "${TMP_UNIT}"
 $SUDO cp "${TMP_UNIT}" "${UNIT_PATH}"
 rm -f "${TMP_UNIT}"
@@ -79,5 +84,13 @@ $SUDO systemctl restart "${SERVICE_NAME}"
 
 log "Done. Status:"
 $SUDO systemctl --no-pager status "${SERVICE_NAME}" || true
-log "Dashboard: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || echo YOUR_EC2_IP)/"
+
+sleep 2
+if curl -sf -m 5 "http://127.0.0.1:${WEB_PORT}/health" >/dev/null; then
+  PUB="$(curl -sf -m 2 http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || echo YOUR_EC2_IP)"
+  log "Dashboard OK: http://${PUB}:${WEB_PORT}/"
+  log "Open EC2 security group: inbound TCP ${WEB_PORT}"
+else
+  die "Service did not respond on port ${WEB_PORT}. Run: chmod +x diagnose.sh && ./diagnose.sh"
+fi
 log "Logs: sudo journalctl -u ${SERVICE_NAME} -f"
