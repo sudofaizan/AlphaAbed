@@ -99,12 +99,10 @@ def open_market_parallel(
     if should_trade_capiffy(cfg):
 
         def _cap() -> Any:
-            return capiffy_client.place_order(
+            return capiffy_client.open_position(
                 symbol=cap_sym,
                 side=side_cap,
                 volume=cap_vol,
-                order_type="MARKET",
-                price=float(plan.entry),
                 stop_loss=plan.sl,
                 take_profit=plan.tp,
                 cfg=cfg,
