@@ -54,6 +54,13 @@ if ! grep -qE '^SESSION_STRING=.+' "${APP_DIR}/.env" && [[ ! -f "${APP_DIR}/tele
   die "No Telegram session. Run: chmod +x login.sh && ./login.sh — paste SESSION_STRING into .env, then re-run deploy."
 fi
 
+log "Allow binding to port 80 (cap_net_bind_service on venv python)..."
+PYBIN="$("${APP_DIR}/venv/bin/python" -c 'import sys; print(sys.executable)')"
+if [[ -n "${PYBIN}" && -f "${PYBIN}" ]]; then
+  $SUDO setcap 'cap_net_bind_service=+ep' "${PYBIN}" 2>/dev/null || \
+    log "Note: setcap failed — open port 80 in security group; you may need sudo / nginx proxy."
+fi
+
 log "Installing systemd unit (${UNIT_PATH})..."
 TMP_UNIT="$(mktemp)"
 sed \
@@ -72,4 +79,5 @@ $SUDO systemctl restart "${SERVICE_NAME}"
 
 log "Done. Status:"
 $SUDO systemctl --no-pager status "${SERVICE_NAME}" || true
+log "Dashboard: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || echo YOUR_EC2_IP)/"
 log "Logs: sudo journalctl -u ${SERVICE_NAME} -f"

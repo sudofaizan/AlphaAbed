@@ -1,5 +1,5 @@
 [Unit]
-Description=AlphaAbed Telegram channel watcher
+Description=AlphaAbed web dashboard + Telegram signal automation
 After=network-online.target
 Wants=network-online.target
 
@@ -9,7 +9,7 @@ User=__SERVICE_USER__
 Group=__SERVICE_USER__
 WorkingDirectory=__APP_DIR__
 EnvironmentFile=__APP_DIR__/.env
-ExecStart=__APP_DIR__/venv/bin/python __APP_DIR__/watch_channel.py
+ExecStart=__APP_DIR__/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 80
 Restart=on-failure
 RestartSec=10
 StandardOutput=journal

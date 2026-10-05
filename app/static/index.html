@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AlphaAbed — Signal Dashboard</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header>
+    <h1>AlphaAbed</h1>
+    <p class="sub">Abeid FX Telegram → MT5 (AlphaFX API)</p>
+  </header>
+
+  <section class="cards">
+    <div class="card">
+      <h2>Today P/L</h2>
+      <p id="todayPnl" class="big">—</p>
+      <p class="muted">Equity: <span id="equity">—</span></p>
+    </div>
+    <div class="card">
+      <h2>Telegram</h2>
+      <p id="tgStatus" class="badge">—</p>
+      <button type="button" id="btnTestTg">Test fetch</button>
+    </div>
+    <div class="card">
+      <h2>MT5 API</h2>
+      <p id="mt5Status" class="badge">—</p>
+      <button type="button" id="btnTestMt5">Test connection</button>
+    </div>
+    <div class="card">
+      <h2>Worker</h2>
+      <p class="muted">Last poll: <span id="lastPoll">—</span></p>
+      <p class="muted">Last msg id: <span id="lastMsgId">—</span></p>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Settings</h2>
+    <form id="cfgForm" class="grid">
+      <label>Poll interval (sec)<input name="poll_interval_sec" type="number" min="5" /></label>
+      <label>MT5 base URL<input name="mt5_base_url" type="text" placeholder="http://15.135.71.95:8080" /></label>
+      <label>API key<input name="mt5_api_key" type="text" /></label>
+      <label>Symbol<input name="mt5_symbol" type="text" placeholder="XAUUSD.pr" /></label>
+      <label>Lot size<input name="volume" type="number" step="0.01" min="0.01" /></label>
+      <label>Reward : Risk (TP)<input name="reward_risk_ratio" type="number" step="0.1" min="0.5" /></label>
+      <label>Fetch limit (history)<input name="telegram_fetch_limit" type="number" min="10" max="500" /></label>
+      <label>Default SL (points, no SL in msg)<input name="default_sl_points" type="number" min="0" /></label>
+      <label class="check"><input name="prefer_signal_tp" type="checkbox" /> Use TP from message when present</label>
+      <label class="check"><input name="allow_trade_without_sl" type="checkbox" /> Trade without SL (use default points)</label>
+      <label class="check warn"><input name="auto_trade" type="checkbox" /> Auto-trade live orders</label>
+      <div class="actions">
+        <button type="submit">Save settings</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="panel">
+    <div class="row">
+      <h2>Signal history (sorted from last N messages)</h2>
+      <button type="button" id="btnRefreshSignals">Refresh last 100</button>
+    </div>
+    <p class="muted">Only trade-related messages (signals, close, incomplete, SL fragments). Promos and chat hidden.</p>
+    <div id="signalList" class="signal-list"></div>
+  </section>
+
+  <section class="panel">
+    <h2>Live events</h2>
+    <ul id="eventLog" class="event-log"></ul>
+  </section>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

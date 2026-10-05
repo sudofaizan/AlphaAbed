@@ -10,6 +10,7 @@ from datetime import timezone
 from telethon import events
 from telethon.errors import ChannelInvalidError, ChannelPrivateError, UsernameInvalidError
 
+from signals.handler import SignalHandler
 from telegram_util import build_client, require_env
 
 logging.basicConfig(
@@ -52,11 +53,24 @@ async def main() -> None:
         sys.exit(1)
 
     title = getattr(entity, "title", channel)
-    log.info("Watching channel: %s (%s)", title, channel)
+    auto_trade = os.getenv("MT5_AUTO_TRADE", "false").lower() == "true"
+    dry_run = os.getenv("MT5_DRY_RUN", "true").lower() != "false"
+    log.info(
+        "Watching channel: %s (%s) | auto_trade=%s dry_run=%s",
+        title,
+        channel,
+        auto_trade,
+        dry_run,
+    )
+
+    signal_handler = SignalHandler()
 
     @client.on(events.NewMessage(chats=entity))
     async def handler(event):
+        text = (event.message.message or "").strip()
         log.info("New message: %s", format_message(event.message))
+        if text:
+            await signal_handler.handle(text, event.message.id)
 
     poll_seconds = int(os.getenv("POLL_HEARTBEAT_SECONDS", "0"))
     if poll_seconds > 0:

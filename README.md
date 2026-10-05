@@ -63,6 +63,27 @@ Or, if `venv` already exists:
 
 Copy the printed `SESSION_STRING=...` into `.env`, then run `./deploy_ec2.sh`.
 
+## Web dashboard (port 80 on EC2)
+
+After deploy, open **`http://YOUR_EC2_IP/`** (allow **TCP 80** in the EC2 security group).
+
+The UI includes:
+
+- Poll interval, MT5 URL (`http://15.135.71.95:8080`), API key (`alphafx`), symbol (`XAUUSD.pr`), **0.1 lot**
+- **Reward:risk** for TP (default **1:2**) when the message has no TP
+- **Test Telegram** / **Test MT5** buttons
+- **Today P/L** from `GET /getAccountHealth`
+- **Signal history** — last 100 messages, **signals only** (no VIP spam)
+- **Auto-trade** toggle (off by default)
+
+Local dev:
+
+```bash
+./run_web.sh   # http://localhost:8000
+```
+
+See [API_DOCUMENTATION.md](API_DOCUMENTATION.md) for AlphaFX endpoints used: `/getPrice`, `/placeOrder`, `/closePositions`, `/getAccountHealth`.
+
 ## Deploy on Amazon Linux (EC2)
 
 After SSH to the instance:
@@ -105,6 +126,60 @@ SERVICE_USER=ec2-user ./deploy_ec2.sh
 | `SESSION_STRING` | EC2 | From `login_session.py` |
 | `LIMIT` | no | Messages for `check_channel.py` (default 20) |
 | `POLL_HEARTBEAT_SECONDS` | no | Daemon heartbeat in logs (default 300, `0` disables) |
+
+## Sort signals vs noise
+
+From `msg.txt`:
+
+```bash
+./venv/bin/python sort_messages.py msg.txt
+```
+
+Trade-related only (default kinds):
+
+```bash
+./venv/bin/python sort_messages.py msg.txt --only open_signal,close_all,partial_close,incomplete_signal,sl_fragment
+```
+
+Live fetch + sort:
+
+```bash
+./venv/bin/python sort_messages.py -n 100
+```
+
+**Kinds:** `open_signal` (BUY/SELL + SL), `close_all` (“Closing all.”), `partial_close`, `incomplete_signal` / `sl_fragment` (e.g. entry then next message `SL 4134`), `promo`, `commentary`.
+
+## MT5 API (optional)
+
+When a classified message is actionable, the daemon can POST JSON to your backend.
+
+| Env | Default | Meaning |
+|-----|---------|---------|
+| `MT5_AUTO_TRADE` | `false` | Call API on signals |
+| `MT5_DRY_RUN` | `true` | Log only, no HTTP |
+| `MT5_API_URL` | `http://127.0.0.1:8080` | Base URL |
+
+**Open order body** (`POST` `{MT5_OPEN_PATH}`):
+
+```json
+{
+  "action": "open",
+  "side": "sell",
+  "symbol": "XAUUSD",
+  "entry": 4147,
+  "entry_min": null,
+  "entry_max": null,
+  "sl": 4155,
+  "tp": null,
+  "market": false,
+  "source": "telegram",
+  "source_message_id": 1500
+}
+```
+
+**Close all** (`POST` `{MT5_CLOSE_PATH}`): `{"action":"close_all","source_message_id":1502}`
+
+Set `MT5_DRY_RUN=false` and `MT5_AUTO_TRADE=true` only after your API matches this shape (or tell us your API schema to adapt).
 
 ## Security
 

@@ -3,5 +3,6 @@
 *.session
 *.session-journal
 msg.txt
+data/
 __pycache__/
 *.pyc
