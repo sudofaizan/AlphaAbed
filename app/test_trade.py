@@ -1,12 +1,15 @@
-"""Small live orders to verify MT5 API (0.01 lot)."""
+"""Small live orders to verify MT5 / Capiffy (parallel when both selected)."""
 
 from __future__ import annotations
 
 from typing import Any
 
+from app.dual_trade import close_all_parallel, open_market_parallel, should_trade_capiffy, should_trade_mt5
 from signals.alphafx_client import AlphaFxClient, AlphaFxConfig
+from signals.classify import TradeSignal
+from signals.trade_plan import build_trade_plan
 
-TEST_VOLUME = 0.01
+TEST_VOLUME_MT5 = 0.01
 
 
 def _client_from_cfg(cfg: dict) -> AlphaFxClient:
@@ -19,21 +22,29 @@ def _client_from_cfg(cfg: dict) -> AlphaFxClient:
     )
 
 
-def _sl_tp(side: str, entry: float, point: float, sl_points: float, rr: float) -> tuple[float, float]:
-    dist = sl_points * point
-    if side == "buy":
-        sl = entry - dist
-        tp = entry + dist * rr
-    else:
-        sl = entry + dist
-        tp = entry - dist * rr
-    return round(sl, 2), round(tp, 2)
+def _cfg_for_platform(cfg: dict, platform: str) -> dict:
+    p = platform.lower().strip()
+    if p not in ("mt5", "capiffy", "both"):
+        raise ValueError("platform must be mt5, capiffy, or both")
+    out = dict(cfg)
+    out["trade_mt5"] = p in ("mt5", "both")
+    out["capiffy_enabled"] = p in ("capiffy", "both")
+    out["trade_capiffy"] = p in ("capiffy", "both")
+    return out
 
 
-def test_market_open(cfg: dict, side: str) -> dict[str, Any]:
+def test_market_open(cfg: dict, side: str, platform: str = "mt5") -> dict[str, Any]:
     side = side.lower()
     if side not in ("buy", "sell"):
         return {"ok": False, "error": "side must be buy or sell"}
+
+    try:
+        eff = _cfg_for_platform(cfg, platform)
+    except ValueError as exc:
+        return {"ok": False, "error": str(exc)}
+
+    if not should_trade_mt5(eff) and not should_trade_capiffy(eff):
+        return {"ok": False, "error": "no platform selected"}
 
     client = _client_from_cfg(cfg)
     price = client.get_price()
@@ -43,35 +54,48 @@ def test_market_open(cfg: dict, side: str) -> dict[str, Any]:
     bid = float(price["bid"])
     ask = float(price["ask"])
     point = float(price.get("point") or 0.01)
-    entry = ask if side == "buy" else bid
-    sl_pts = float(cfg.get("default_sl_points") or 500)
-    rr = float(cfg.get("reward_risk_ratio") or 2.0)
-    sl, tp = _sl_tp(side, entry, point, sl_pts, rr)
-    comment = (cfg.get("mt5_trade_comment") or "ABD").strip()[:31]
-
-    result = client.place_order(
-        order_type=side,
-        volume=TEST_VOLUME,
-        sl=sl,
-        tp=tp,
-        comment=comment,
+    signal = TradeSignal(side=side, symbol=cfg["mt5_symbol"], market=True)
+    plan = build_trade_plan(
+        signal,
+        bid=bid,
+        ask=ask,
+        reward_risk_ratio=float(cfg.get("reward_risk_ratio") or 2.0),
+        prefer_signal_tp=bool(cfg.get("prefer_signal_tp")),
+        default_sl_points=float(cfg.get("default_sl_points") or 500),
+        point=point,
     )
-    ok = bool(result.get("ok"))
+    if not plan or plan.sl is None:
+        return {"ok": False, "error": "could not build trade plan"}
+
+    cap_vol = float(eff.get("capiffy_volume") or TEST_VOLUME_MT5)
+    result = open_market_parallel(
+        eff,
+        plan,
+        mt5_volume=TEST_VOLUME_MT5 if eff.get("trade_mt5") else None,
+        capiffy_volume=cap_vol if eff.get("trade_capiffy") else None,
+    )
     return {
-        "ok": ok,
+        "ok": bool(result.get("ok")),
         "action": "test_open",
+        "platform": platform,
         "side": side,
-        "volume": TEST_VOLUME,
-        "entry": entry,
-        "sl": sl,
-        "tp": tp,
-        "comment": comment,
+        "mt5_volume": TEST_VOLUME_MT5 if eff.get("trade_mt5") else None,
+        "capiffy_volume": cap_vol if eff.get("trade_capiffy") else None,
+        "plan": plan.__dict__,
         "result": result,
     }
 
 
-def test_close_all(cfg: dict) -> dict[str, Any]:
-    client = _client_from_cfg(cfg)
-    comment = (cfg.get("mt5_trade_comment") or "ABD").strip()[:31]
-    result = client.close_all(cfg["mt5_symbol"], comment=comment)
-    return {"ok": bool(result.get("ok")), "action": "test_close_all", "result": result}
+def test_close_all(cfg: dict, platform: str = "mt5") -> dict[str, Any]:
+    try:
+        eff = _cfg_for_platform(cfg, platform)
+    except ValueError as exc:
+        return {"ok": False, "error": str(exc)}
+
+    result = close_all_parallel(eff)
+    return {
+        "ok": bool(result.get("ok")),
+        "action": "test_close_all",
+        "platform": platform,
+        "result": result,
+    }

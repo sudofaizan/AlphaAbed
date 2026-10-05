@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Optional
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -18,6 +18,7 @@ from app.config_store import load_config, save_config
 from app.datetime_util import enrich_date_ist
 from app.state import state
 from app.telegram_service import test_telegram, fetch_and_classify
+from app.dual_trade import test_capiffy_connection
 from app.test_trade import test_close_all, test_market_open
 from app.worker import refresh_history_once, worker_loop
 from signals.alphafx_client import AlphaFxClient, AlphaFxConfig
@@ -46,6 +47,12 @@ class ConfigUpdate(BaseModel):
     telegram_fetch_limit: Optional[int] = None
     telegram_realtime: Optional[bool] = None
     account_refresh_sec: Optional[int] = None
+    trade_mt5: Optional[bool] = None
+    capiffy_enabled: Optional[bool] = None
+    trade_capiffy: Optional[bool] = None
+    capiffy_volume: Optional[float] = None
+    capiffy_symbol: Optional[str] = None
+    capiffy_account_id: Optional[str] = None
 
 
 class PreviewBody(BaseModel):
@@ -95,6 +102,8 @@ async def api_status():
             "last_telegram_ok": state.last_telegram_ok,
             "last_telegram_error": state.last_telegram_error,
             "last_mt5_ok": state.last_mt5_ok,
+            "last_capiffy_ok": state.last_capiffy_ok,
+            "last_capiffy_error": state.last_capiffy_error,
             "today_pnl": state.today_pnl,
             "account_equity": state.account_equity,
             "last_message_id": state.last_message_id,
@@ -129,21 +138,31 @@ async def api_test_telegram():
 
 
 @app.post("/api/test/trade/buy")
-async def api_test_trade_buy():
+async def api_test_trade_buy(platform: str = Query("mt5")):
     cfg = load_config()
-    return await run_blocking(test_market_open, cfg, "buy")
+    return await run_blocking(test_market_open, cfg, "buy", platform)
 
 
 @app.post("/api/test/trade/sell")
-async def api_test_trade_sell():
+async def api_test_trade_sell(platform: str = Query("mt5")):
     cfg = load_config()
-    return await run_blocking(test_market_open, cfg, "sell")
+    return await run_blocking(test_market_open, cfg, "sell", platform)
 
 
 @app.post("/api/test/trade/close-all")
-async def api_test_trade_close_all():
+async def api_test_trade_close_all(platform: str = Query("mt5")):
     cfg = load_config()
-    return await run_blocking(test_close_all, cfg)
+    return await run_blocking(test_close_all, cfg, platform)
+
+
+@app.post("/api/test/capiffy")
+async def api_test_capiffy():
+    cfg = load_config()
+    result = await run_blocking(test_capiffy_connection, cfg)
+    with state.lock:
+        state.last_capiffy_ok = result.get("ok", False)
+        state.last_capiffy_error = result.get("error")
+    return result
 
 
 @app.post("/api/test/mt5")

@@ -24,6 +24,12 @@ DEFAULTS = {
     "allow_trade_without_sl": False,
     "default_sl_points": 500,
     "telegram_fetch_limit": 100,
+    "trade_mt5": True,
+    "capiffy_enabled": False,
+    "trade_capiffy": False,
+    "capiffy_volume": 0.01,
+    "capiffy_symbol": "XAUUSD",
+    "capiffy_account_id": "",
     "signal_kinds_history": [
         "open_signal",
         "close_all",

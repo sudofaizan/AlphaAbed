@@ -155,3 +155,29 @@ input[type="text"], input[type="number"] {
   padding: 0.5rem;
   border-radius: 6px;
 }
+
+.inline-card {
+  margin-top: 0.75rem;
+  max-width: 320px;
+}
+.inline-card h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.platform-toggle {
+  border: 1px solid #2a3548;
+  border-radius: 8px;
+  padding: 0.65rem 1rem;
+  margin: 0.75rem 0;
+}
+.platform-toggle legend {
+  color: var(--muted);
+  font-size: 0.85rem;
+  padding: 0 0.35rem;
+}
+.platform-toggle label {
+  margin-right: 1rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+}

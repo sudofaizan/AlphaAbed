@@ -73,6 +73,12 @@ async function loadStatus() {
   mt5.textContent = s.last_mt5_ok ? "OK" : "Check connection";
   mt5.className = "badge " + (s.last_mt5_ok ? "ok" : "bad");
 
+  const cap = document.getElementById("capiffyStatus");
+  if (cap) {
+    cap.textContent = s.last_capiffy_ok ? "OK" : s.last_capiffy_error || "Not tested";
+    cap.className = "badge " + (s.last_capiffy_ok ? "ok" : "bad");
+  }
+
   fillForm(s.config);
 }
 
@@ -108,7 +114,13 @@ function renderCurrentSettings(cfg) {
     ["MT5 URL", cfg.mt5_base_url ?? "—"],
     ["API key", maskKey(cfg.mt5_api_key)],
     ["Symbol", cfg.mt5_symbol ?? "—"],
-    ["Lot size", cfg.volume ?? "—"],
+    ["MT5 lot", cfg.volume ?? "—"],
+    ["Auto-trade MT5", yn(cfg.trade_mt5 !== false)],
+    ["Capiffy enabled", yn(cfg.capiffy_enabled)],
+    ["Auto-trade Capiffy", yn(cfg.trade_capiffy)],
+    ["Capiffy lot", cfg.capiffy_volume ?? "—"],
+    ["Capiffy symbol", cfg.capiffy_symbol ?? "—"],
+    ["Capiffy account id", cfg.capiffy_account_id || "(from .env)"],
     ["Order comment", cfg.mt5_trade_comment ?? "ABD"],
     ["Reward : risk (TP)", cfg.reward_risk_ratio ?? "—"],
     ["Use signal TP", yn(cfg.prefer_signal_tp)],
@@ -191,27 +203,47 @@ function showTestResult(r) {
   el.textContent = JSON.stringify(r, null, 2);
 }
 
+function selectedTestPlatform() {
+  const el = document.querySelector('input[name="testPlatform"]:checked');
+  return el ? el.value : "mt5";
+}
+
 async function runTestTrade(path, confirmMsg) {
   if (!confirm(confirmMsg)) return;
-  const r = await api(path, { method: "POST" });
+  const platform = selectedTestPlatform();
+  const q = `?platform=${encodeURIComponent(platform)}`;
+  const r = await api(path + q, { method: "POST" });
   showTestResult(r);
   if (r.ok) {
-    alert("OK — check MT5 terminal for position (comment ABD).");
+    alert(`OK (${platform}) — check MT5 and/or Capiffy for the position.`);
   } else {
     alert("Failed:\n" + (r.error || JSON.stringify(r.result || r, null, 2)));
   }
   loadStatus();
 }
 
-document.getElementById("btnTestBuy").addEventListener("click", () =>
-  runTestTrade("/api/test/trade/buy", "Open TEST market BUY 0.01 lot with SL/TP?")
-);
-document.getElementById("btnTestSell").addEventListener("click", () =>
-  runTestTrade("/api/test/trade/sell", "Open TEST market SELL 0.01 lot with SL/TP?")
-);
-document.getElementById("btnTestCloseAll").addEventListener("click", () =>
-  runTestTrade("/api/test/trade/close-all", "Close ALL open positions on this symbol/account?")
-);
+document.getElementById("btnTestBuy").addEventListener("click", () => {
+  const p = selectedTestPlatform();
+  runTestTrade("/api/test/trade/buy", `Open TEST market BUY on ${p}?`);
+});
+document.getElementById("btnTestSell").addEventListener("click", () => {
+  const p = selectedTestPlatform();
+  runTestTrade("/api/test/trade/sell", `Open TEST market SELL on ${p}?`);
+});
+document.getElementById("btnTestCloseAll").addEventListener("click", () => {
+  const p = selectedTestPlatform();
+  runTestTrade("/api/test/trade/close-all", `Close ALL positions on ${p}?`);
+});
+
+document.getElementById("btnTestCapiffy").addEventListener("click", async () => {
+  const r = await api("/api/test/capiffy", { method: "POST" });
+  showTestResult(r);
+  const msg = r.ok
+    ? `Capiffy OK\nAccount: ${r.account_id}\nBalance: ${r.balance}\nOpen positions: ${r.open_positions}\nToken expires in: ${r.access_expires_in}s`
+    : `Failed: ${r.error}`;
+  alert(msg);
+  loadStatus();
+});
 
 document.getElementById("btnTestMt5").addEventListener("click", async () => {
   const r = await api("/api/test/mt5", { method: "POST" });

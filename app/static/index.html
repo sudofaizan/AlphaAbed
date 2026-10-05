@@ -9,7 +9,7 @@
 <body>
   <header>
     <h1>AlphaAbed</h1>
-    <p class="sub">Abeid FX Telegram → MT5 (AlphaFX API)</p>
+    <p class="sub">Abeid FX Telegram → MT5 + Capiffy (parallel when enabled)</p>
   </header>
 
   <section class="cards">
@@ -36,11 +36,27 @@
   </section>
 
   <section class="panel">
-    <h2>Test MT5 trades (0.01 lot)</h2>
-    <p class="muted warn-text">Places real orders on your account. SL/TP use default SL points from settings. Comment: ABD.</p>
+    <h2>Dual platform — Capiffy + MT5</h2>
+    <p class="muted">Inspired by <a href="https://github.com/sudofaizan/capicopy" target="_blank" rel="noopener">capicopy</a>: auto-trades fire <strong>both legs at once</strong> when enabled (not one after the other). Capiffy tokens live in <code>.env</code>; toggles below are saved in <code>data/config.json</code>.</p>
+    <div class="card inline-card">
+      <h3>Capiffy account</h3>
+      <p id="capiffyStatus" class="badge">—</p>
+      <button type="button" id="btnTestCapiffy">Test Capiffy connection</button>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Test trades (live)</h2>
+    <p class="muted warn-text">Real orders. MT5 test lot 0.01; Capiffy uses Capiffy lot from settings. SL/TP from default SL points + R:R.</p>
+    <fieldset class="platform-toggle">
+      <legend>Send test order to</legend>
+      <label><input type="radio" name="testPlatform" value="mt5" checked /> MT5 only</label>
+      <label><input type="radio" name="testPlatform" value="capiffy" /> Capiffy only</label>
+      <label><input type="radio" name="testPlatform" value="both" /> Both (parallel)</label>
+    </fieldset>
     <div class="btn-row">
-      <button type="button" id="btnTestBuy" class="btn-buy">Test BUY 0.01</button>
-      <button type="button" id="btnTestSell" class="btn-sell">Test SELL 0.01</button>
+      <button type="button" id="btnTestBuy" class="btn-buy">Test BUY</button>
+      <button type="button" id="btnTestSell" class="btn-sell">Test SELL</button>
       <button type="button" id="btnTestCloseAll" class="btn-close">Close all</button>
     </div>
     <pre id="testTradeResult" class="test-result muted">—</pre>
@@ -65,7 +81,13 @@
       <label>API key<input name="mt5_api_key" type="text" /></label>
       <label>Symbol<input name="mt5_symbol" type="text" placeholder="XAUUSD.pr" /></label>
       <label>Order comment (MT5)<input name="mt5_trade_comment" type="text" maxlength="31" placeholder="ABD" /></label>
-      <label>Lot size<input name="volume" type="number" step="0.01" min="0.01" /></label>
+      <label>MT5 lot size<input name="volume" type="number" step="0.01" min="0.01" /></label>
+      <label class="check"><input name="trade_mt5" type="checkbox" /> Auto-trade on MT5</label>
+      <label class="check"><input name="capiffy_enabled" type="checkbox" /> Capiffy enabled</label>
+      <label class="check"><input name="trade_capiffy" type="checkbox" /> Auto-trade on Capiffy (parallel with MT5)</label>
+      <label>Capiffy lot size<input name="capiffy_volume" type="number" step="0.01" min="0.01" /></label>
+      <label>Capiffy symbol<input name="capiffy_symbol" type="text" placeholder="XAUUSD" /></label>
+      <label>Capiffy account id (optional if in .env)<input name="capiffy_account_id" type="text" placeholder="" /></label>
       <label>Reward : Risk (TP)<input name="reward_risk_ratio" type="number" step="0.1" min="0.5" /></label>
       <label>Fetch limit (history)<input name="telegram_fetch_limit" type="number" min="10" max="500" /></label>
       <label>Default SL (points, no SL in msg)<input name="default_sl_points" type="number" min="0" /></label>
@@ -92,6 +114,6 @@
     <ul id="eventLog" class="event-log"></ul>
   </section>
 
-  <script src="/static/app.js?v=2"></script>
+  <script src="/static/app.js?v=3"></script>
 </body>
 </html>

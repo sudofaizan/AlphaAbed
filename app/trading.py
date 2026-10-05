@@ -6,6 +6,7 @@ import logging
 from typing import Any
 
 from app.async_io import run_blocking
+from app.dual_trade import close_all_parallel, open_market_parallel, partial_close_mt5
 from signals.alphafx_client import AlphaFxClient, AlphaFxConfig
 from signals.classify import TradeSignal, classify_text, merge_sl_fragment
 from signals.trade_plan import build_trade_plan
@@ -46,21 +47,14 @@ def _process_signal_row_sync(row: dict[str, Any], cfg: dict) -> dict[str, Any] |
         )
     )
 
-    trade_comment = (cfg.get("mt5_trade_comment") or "ABD").strip()[:31]
-
     if kind == "close_all":
-        return {
-            "action": "close_all",
-            "result": client.close_all(cfg["mt5_symbol"], comment=trade_comment),
-        }
+        return {"action": "close_all", "result": close_all_parallel(cfg)}
 
     if kind == "partial_close":
         vol = float(cfg["volume"]) / 2
         return {
             "action": "partial_close",
-            "result": client.close_partial(
-                cfg["mt5_symbol"], vol, comment=trade_comment
-            ),
+            "result": partial_close_mt5(cfg, vol),
         }
 
     if not parsed.signal:
@@ -91,14 +85,8 @@ def _process_signal_row_sync(row: dict[str, Any], cfg: dict) -> dict[str, Any] |
     if not plan or plan.sl is None:
         return {"action": "skipped", "reason": "could not build trade plan"}
 
-    # Always market orders; ignore AT / FROM entry prices in messages.
-    result = client.place_order(
-        order_type=plan.side,
-        volume=float(cfg["volume"]),
-        sl=plan.sl,
-        tp=plan.tp,
-        comment=trade_comment,
-    )
+    # Always market orders; MT5 + Capiffy fire in parallel when both enabled.
+    result = open_market_parallel(cfg, plan)
 
     return {
         "action": "open",
