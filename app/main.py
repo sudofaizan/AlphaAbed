@@ -16,6 +16,7 @@ from pydantic import BaseModel
 from app.config_store import load_config, save_config
 from app.state import state
 from app.telegram_service import test_telegram, fetch_and_classify
+from app.test_trade import test_close_all, test_market_open
 from app.worker import refresh_history_once, worker_loop
 from signals.alphafx_client import AlphaFxClient, AlphaFxConfig
 from signals.trade_plan import build_trade_plan
@@ -33,6 +34,7 @@ class ConfigUpdate(BaseModel):
     mt5_base_url: Optional[str] = None
     mt5_api_key: Optional[str] = None
     mt5_symbol: Optional[str] = None
+    mt5_trade_comment: Optional[str] = None
     volume: Optional[float] = None
     reward_risk_ratio: Optional[float] = None
     prefer_signal_tp: Optional[bool] = None
@@ -40,6 +42,8 @@ class ConfigUpdate(BaseModel):
     allow_trade_without_sl: Optional[bool] = None
     default_sl_points: Optional[float] = None
     telegram_fetch_limit: Optional[int] = None
+    telegram_realtime: Optional[bool] = None
+    account_refresh_sec: Optional[int] = None
 
 
 class PreviewBody(BaseModel):
@@ -114,6 +118,24 @@ async def api_test_telegram():
         state.last_telegram_ok = result.get("ok", False)
         state.last_telegram_error = result.get("error")
     return result
+
+
+@app.post("/api/test/trade/buy")
+async def api_test_trade_buy():
+    cfg = load_config()
+    return test_market_open(cfg, "buy")
+
+
+@app.post("/api/test/trade/sell")
+async def api_test_trade_sell():
+    cfg = load_config()
+    return test_market_open(cfg, "sell")
+
+
+@app.post("/api/test/trade/close-all")
+async def api_test_trade_close_all():
+    cfg = load_config()
+    return test_close_all(cfg)
 
 
 @app.post("/api/test/mt5")

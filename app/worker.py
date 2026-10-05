@@ -1,4 +1,4 @@
-"""Background Telegram poll loop."""
+"""Background Telegram (realtime + optional backup poll) and account refresh."""
 
 from __future__ import annotations
 
@@ -8,7 +8,11 @@ from datetime import datetime, timezone
 
 from app.config_store import load_config
 from app.state import state
-from app.telegram_service import fetch_and_classify, poll_new_messages
+from app.telegram_service import (
+    fetch_and_classify,
+    poll_new_messages,
+    run_realtime_listener,
+)
 from app.trading import process_signal_row
 from signals.alphafx_client import AlphaFxClient, AlphaFxConfig
 
@@ -32,39 +36,67 @@ async def refresh_account_metrics(cfg: dict) -> None:
             state.account_equity = health.get("equity")
 
 
+async def _handle_row(row: dict, cfg: dict) -> None:
+    trade = await process_signal_row(row, cfg)
+    kinds = cfg.get("signal_kinds_history") or []
+    with state.lock:
+        if row["kind"] in kinds:
+            state.signal_history.insert(0, row)
+            state.signal_history = state.signal_history[:200]
+        state.last_message_id = max(state.last_message_id, int(row["message_id"]))
+    if trade:
+        state.push_event("trade", str(trade), trade=trade)
+    state.push_event("signal", row.get("summary", ""), row=row)
+
+
 async def worker_loop(stop_event: asyncio.Event) -> None:
     state.worker_running = True
     log.info("Worker started")
+
+    listener_task: asyncio.Task | None = None
+
+    async def on_row(row: dict, cfg: dict) -> None:
+        await _handle_row(row, cfg)
+        with state.lock:
+            state.last_poll_at = datetime.now(timezone.utc).isoformat()
+            state.last_telegram_ok = True
+            state.last_telegram_error = None
+
     while not stop_event.is_set():
         cfg = load_config()
-        interval = max(5, int(cfg.get("poll_interval_sec", 30)))
-        try:
-            async def on_signal(row, c):
-                trade = await process_signal_row(row, c)
-                with state.lock:
-                    if row["kind"] in (c.get("signal_kinds_history") or []):
-                        state.signal_history.insert(0, row)
-                        state.signal_history = state.signal_history[:200]
-                if trade:
-                    state.push_event("trade", str(trade), trade=trade)
-                state.push_event("signal", row.get("summary", ""), row=row)
+        realtime = bool(cfg.get("telegram_realtime", True))
+        poll_sec = max(1, int(cfg.get("poll_interval_sec", 1)))
+        acct_sec = max(1, int(cfg.get("account_refresh_sec", 15)))
 
-            new_max = await poll_new_messages(cfg, state.last_message_id, on_signal)
-            with state.lock:
-                state.last_message_id = max(state.last_message_id, new_max)
+        if realtime and (listener_task is None or listener_task.done()):
+            log.info("Starting Telegram realtime listener (instant new messages)")
+            listener_task = asyncio.create_task(run_realtime_listener(stop_event, on_row))
+
+        try:
+            if not realtime:
+                await poll_new_messages(cfg, state.last_message_id, on_row)
             await refresh_account_metrics(cfg)
             with state.lock:
                 state.last_poll_at = datetime.now(timezone.utc).isoformat()
                 state.last_telegram_ok = True
                 state.last_telegram_error = None
         except Exception as e:
-            log.exception("Poll error")
+            log.exception("Worker cycle error")
             with state.lock:
                 state.last_telegram_ok = False
                 state.last_telegram_error = str(e)
+
+        wait = poll_sec if not realtime else acct_sec
         try:
-            await asyncio.wait_for(stop_event.wait(), timeout=interval)
+            await asyncio.wait_for(stop_event.wait(), timeout=wait)
         except asyncio.TimeoutError:
+            pass
+
+    if listener_task and not listener_task.done():
+        listener_task.cancel()
+        try:
+            await listener_task
+        except asyncio.CancelledError:
             pass
     state.worker_running = False
 

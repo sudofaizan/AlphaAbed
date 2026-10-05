@@ -82,7 +82,7 @@ class AlphaFxClient:
         sl: float | None = None,
         tp: float | None = None,
         price: float | None = None,
-        comment: str = "AlphaAbed",
+        comment: str = "ABD",
         magic: int | None = None,
     ) -> dict:
         payload: dict = {
@@ -101,14 +101,20 @@ class AlphaFxClient:
             payload["magic"] = magic
         return self._request("POST", "/placeOrder", body=payload)
 
-    def close_all(self, symbol: str | None = None) -> dict:
-        body: dict = {}
+    def close_all(self, symbol: str | None = None, *, comment: str = "ABD") -> dict:
+        body: dict = {"comment": comment}
         if symbol:
             body["symbol"] = symbol
         return self._request("POST", "/closePositions", body=body)
 
-    def close_partial(self, symbol: str | None = None, volume: float | None = None) -> dict:
-        body: dict = {"symbol": symbol or self.cfg.symbol}
+    def close_partial(
+        self,
+        symbol: str | None = None,
+        volume: float | None = None,
+        *,
+        comment: str = "ABD",
+    ) -> dict:
+        body: dict = {"symbol": symbol or self.cfg.symbol, "comment": comment}
         if volume is not None:
             body["volume"] = volume
         return self._request("POST", "/closePositions", body=body)

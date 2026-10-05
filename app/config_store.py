@@ -9,10 +9,13 @@ from copy import deepcopy
 from pathlib import Path
 
 DEFAULTS = {
-    "poll_interval_sec": 30,
+    "poll_interval_sec": 1,
+    "telegram_realtime": True,
+    "account_refresh_sec": 15,
     "mt5_base_url": "http://15.135.71.95:8080",
     "mt5_api_key": "alphafx",
     "mt5_symbol": "XAUUSD.pr",
+    "mt5_trade_comment": "ABD",
     "volume": 0.1,
     "reward_risk_ratio": 2.0,
     "prefer_signal_tp": False,

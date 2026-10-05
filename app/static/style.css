@@ -105,3 +105,18 @@ input[type="text"], input[type="number"] {
   color: var(--muted);
 }
 .event-log li { padding: 0.25rem 0; border-bottom: 1px solid #2a3548; }
+
+.warn-text { color: var(--warn); }
+.btn-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; }
+.btn-buy { background: #16a34a; }
+.btn-sell { background: #dc2626; }
+.btn-close { background: #64748b; }
+.test-result {
+  margin-top: 0.75rem;
+  font-size: 0.78rem;
+  max-height: 160px;
+  overflow: auto;
+  background: #0f1419;
+  padding: 0.5rem;
+  border-radius: 6px;
+}

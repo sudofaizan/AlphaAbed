@@ -48,14 +48,21 @@ async def process_signal_row(row: dict[str, Any], cfg: dict) -> dict[str, Any] |
         )
     )
 
+    trade_comment = (cfg.get("mt5_trade_comment") or "ABD").strip()[:31]
+
     if kind == "close_all":
-        return {"action": "close_all", "result": client.close_all(cfg["mt5_symbol"])}
+        return {
+            "action": "close_all",
+            "result": client.close_all(cfg["mt5_symbol"], comment=trade_comment),
+        }
 
     if kind == "partial_close":
         vol = float(cfg["volume"]) / 2
         return {
             "action": "partial_close",
-            "result": client.close_partial(cfg["mt5_symbol"], vol),
+            "result": client.close_partial(
+                cfg["mt5_symbol"], vol, comment=trade_comment
+            ),
         }
 
     if not parsed.signal:
@@ -98,7 +105,7 @@ async def process_signal_row(row: dict[str, Any], cfg: dict) -> dict[str, Any] |
             sl=plan.sl,
             tp=plan.tp,
             price=mid,
-            comment=f"tg:{row.get('message_id')}",
+            comment=trade_comment,
         )
     else:
         result = client.place_order(
@@ -106,7 +113,7 @@ async def process_signal_row(row: dict[str, Any], cfg: dict) -> dict[str, Any] |
             volume=float(cfg["volume"]),
             sl=plan.sl,
             tp=plan.tp,
-            comment=f"tg:{row.get('message_id')}",
+            comment=trade_comment,
         )
 
     return {

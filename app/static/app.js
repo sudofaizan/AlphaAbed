@@ -88,6 +88,33 @@ document.getElementById("btnTestTg").addEventListener("click", async () => {
   loadStatus();
 });
 
+function showTestResult(r) {
+  const el = document.getElementById("testTradeResult");
+  el.textContent = JSON.stringify(r, null, 2);
+}
+
+async function runTestTrade(path, confirmMsg) {
+  if (!confirm(confirmMsg)) return;
+  const r = await api(path, { method: "POST" });
+  showTestResult(r);
+  if (r.ok) {
+    alert("OK — check MT5 terminal for position (comment ABD).");
+  } else {
+    alert("Failed:\n" + (r.error || JSON.stringify(r.result || r, null, 2)));
+  }
+  loadStatus();
+}
+
+document.getElementById("btnTestBuy").addEventListener("click", () =>
+  runTestTrade("/api/test/trade/buy", "Open TEST market BUY 0.01 lot with SL/TP?")
+);
+document.getElementById("btnTestSell").addEventListener("click", () =>
+  runTestTrade("/api/test/trade/sell", "Open TEST market SELL 0.01 lot with SL/TP?")
+);
+document.getElementById("btnTestCloseAll").addEventListener("click", () =>
+  runTestTrade("/api/test/trade/close-all", "Close ALL open positions on this symbol/account?")
+);
+
 document.getElementById("btnTestMt5").addEventListener("click", async () => {
   const r = await api("/api/test/mt5", { method: "POST" });
   const msg = r.ok

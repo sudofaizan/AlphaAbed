@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 from datetime import timezone
 from typing import Any
 
+from app.config_store import load_config
+
+from telethon import events
 from telethon.errors import ChannelInvalidError, ChannelPrivateError, UsernameInvalidError
 
 from signals.classify import classify_text, format_signal_line
@@ -160,6 +164,31 @@ async def fetch_and_classify(limit: int, cfg: dict) -> dict[str, Any]:
         "signals": signals,
         "price": {"bid": bid, "ask": ask, "ok": price_resp.get("ok", False)},
     }
+
+
+async def run_realtime_listener(stop_event: asyncio.Event, on_signal) -> None:
+    """Push-based new messages (typically within ~1s of channel post)."""
+    channel = require_env("CHANNEL")
+    client, _, _ = build_client()
+    await client.start()
+    if not await client.is_user_authorized():
+        raise RuntimeError("Telegram not authorized")
+    entity = await client.get_entity(channel)
+    tglog = logging.getLogger("alphaabed.telegram")
+
+    @client.on(events.NewMessage(chats=entity))
+    async def _handler(event):
+        body = (event.message.message or "").strip()
+        if not body:
+            return
+        row = _msg_record(event.message, body)
+        cfg = load_config()
+        await on_signal(row, cfg)
+
+    tglog.info("Telegram realtime connected to %s", channel)
+    while not stop_event.is_set():
+        await asyncio.sleep(0.25)
+    await client.disconnect()
 
 
 async def poll_new_messages(

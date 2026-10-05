@@ -36,12 +36,26 @@
   </section>
 
   <section class="panel">
+    <h2>Test MT5 trades (0.01 lot)</h2>
+    <p class="muted warn-text">Places real orders on your account. SL/TP use default SL points from settings. Comment: ABD.</p>
+    <div class="btn-row">
+      <button type="button" id="btnTestBuy" class="btn-buy">Test BUY 0.01</button>
+      <button type="button" id="btnTestSell" class="btn-sell">Test SELL 0.01</button>
+      <button type="button" id="btnTestCloseAll" class="btn-close">Close all</button>
+    </div>
+    <pre id="testTradeResult" class="test-result muted">—</pre>
+  </section>
+
+  <section class="panel">
     <h2>Settings</h2>
     <form id="cfgForm" class="grid">
-      <label>Poll interval (sec)<input name="poll_interval_sec" type="number" min="5" /></label>
+      <label>Poll interval (sec, if realtime off)<input name="poll_interval_sec" type="number" min="1" step="1" /></label>
+      <label>Account / P&amp;L refresh (sec)<input name="account_refresh_sec" type="number" min="1" step="1" /></label>
+      <label class="check"><input name="telegram_realtime" type="checkbox" /> Telegram instant push (recommended)</label>
       <label>MT5 base URL<input name="mt5_base_url" type="text" placeholder="http://15.135.71.95:8080" /></label>
       <label>API key<input name="mt5_api_key" type="text" /></label>
       <label>Symbol<input name="mt5_symbol" type="text" placeholder="XAUUSD.pr" /></label>
+      <label>Order comment (MT5)<input name="mt5_trade_comment" type="text" maxlength="31" placeholder="ABD" /></label>
       <label>Lot size<input name="volume" type="number" step="0.01" min="0.01" /></label>
       <label>Reward : Risk (TP)<input name="reward_risk_ratio" type="number" step="0.1" min="0.5" /></label>
       <label>Fetch limit (history)<input name="telegram_fetch_limit" type="number" min="10" max="500" /></label>
