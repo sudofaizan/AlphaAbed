@@ -6,6 +6,7 @@ import asyncio
 import logging
 from datetime import datetime, timezone
 
+from app.async_io import run_blocking
 from app.config_store import load_config
 from app.state import state
 from app.telegram_service import (
@@ -27,7 +28,7 @@ async def refresh_account_metrics(cfg: dict) -> None:
             symbol=cfg["mt5_symbol"],
         )
     )
-    health = client.account_health()
+    health = await run_blocking(client.account_health)
     with state.lock:
         state.last_mt5_ok = bool(health.get("ok"))
         if health.get("ok"):

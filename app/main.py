@@ -13,6 +13,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from app.async_io import run_blocking
 from app.config_store import load_config, save_config
 from app.state import state
 from app.telegram_service import test_telegram, fetch_and_classify
@@ -123,19 +124,19 @@ async def api_test_telegram():
 @app.post("/api/test/trade/buy")
 async def api_test_trade_buy():
     cfg = load_config()
-    return test_market_open(cfg, "buy")
+    return await run_blocking(test_market_open, cfg, "buy")
 
 
 @app.post("/api/test/trade/sell")
 async def api_test_trade_sell():
     cfg = load_config()
-    return test_market_open(cfg, "sell")
+    return await run_blocking(test_market_open, cfg, "sell")
 
 
 @app.post("/api/test/trade/close-all")
 async def api_test_trade_close_all():
     cfg = load_config()
-    return test_close_all(cfg)
+    return await run_blocking(test_close_all, cfg)
 
 
 @app.post("/api/test/mt5")
@@ -148,9 +149,9 @@ async def api_test_mt5():
             symbol=cfg["mt5_symbol"],
         )
     )
-    health = client.health()
-    account = client.account_health()
-    price = client.get_price()
+    health = await run_blocking(client.health)
+    account = await run_blocking(client.account_health)
+    price = await run_blocking(client.get_price)
     ok = bool(health.get("ok")) and bool(account.get("ok"))
     with state.lock:
         state.last_mt5_ok = ok
@@ -167,8 +168,8 @@ async def api_account():
     client = AlphaFxClient(
         AlphaFxConfig(cfg["mt5_base_url"], cfg["mt5_api_key"], cfg["mt5_symbol"])
     )
-    account = client.account_health()
-    price = client.get_price()
+    account = await run_blocking(client.account_health)
+    price = await run_blocking(client.get_price)
     return {"account": account, "price": price}
 
 
@@ -204,7 +205,7 @@ async def api_preview(body: PreviewBody):
         client = AlphaFxClient(
             AlphaFxConfig(cfg["mt5_base_url"], cfg["mt5_api_key"], cfg["mt5_symbol"])
         )
-        price = client.get_price()
+        price = await run_blocking(client.get_price)
         if price.get("ok") and parsed.kind in ("open_signal", "incomplete_signal"):
             sig = parsed.signal
             plan = build_trade_plan(

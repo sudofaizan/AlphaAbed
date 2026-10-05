@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from app.async_io import run_blocking
 from signals.alphafx_client import AlphaFxClient, AlphaFxConfig
 from signals.classify import TradeSignal, classify_text, merge_sl_fragment
 from signals.trade_plan import build_trade_plan
@@ -14,7 +15,7 @@ log = logging.getLogger("alphaabed.trading")
 _pending: TradeSignal | None = None
 
 
-async def process_signal_row(row: dict[str, Any], cfg: dict) -> dict[str, Any] | None:
+def _process_signal_row_sync(row: dict[str, Any], cfg: dict) -> dict[str, Any] | None:
     global _pending
     parsed = classify_text(row.get("raw_text", ""))
     kind = parsed.kind
@@ -122,3 +123,7 @@ async def process_signal_row(row: dict[str, Any], cfg: dict) -> dict[str, Any] |
         "result": result,
         "message_id": row.get("message_id"),
     }
+
+
+async def process_signal_row(row: dict[str, Any], cfg: dict) -> dict[str, Any] | None:
+    return await run_blocking(_process_signal_row_sync, row, cfg)

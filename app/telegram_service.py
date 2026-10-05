@@ -8,6 +8,7 @@ import os
 from datetime import timezone
 from typing import Any
 
+from app.async_io import run_blocking
 from app.config_store import load_config
 
 from telethon import events
@@ -100,7 +101,7 @@ async def fetch_and_classify(limit: int, cfg: dict) -> dict[str, Any]:
             symbol=cfg["mt5_symbol"],
         )
     )
-    price_resp = mt5.get_price()
+    price_resp = await run_blocking(mt5.get_price)
     bid = float(price_resp.get("bid", 0) or 0)
     ask = float(price_resp.get("ask", 0) or 0)
     point = float(price_resp.get("point", 0.01) or 0.01)

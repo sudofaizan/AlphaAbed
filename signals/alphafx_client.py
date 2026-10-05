@@ -14,7 +14,7 @@ class AlphaFxConfig:
     base_url: str = "http://15.135.71.95:8080"
     api_key: str = "alphafx"
     symbol: str = "XAUUSD.pr"
-    timeout: int = 30
+    timeout: int = 12
 
     @property
     def base(self) -> str:
