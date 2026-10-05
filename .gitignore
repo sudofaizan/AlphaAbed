@@ -2,5 +2,6 @@
 .env
 *.session
 *.session-journal
+msg.txt
 __pycache__/
 *.pyc

@@ -25,6 +25,20 @@ cp .env.example .env
 python check_channel.py
 ```
 
+Last **5** messages into **msg.txt** (EC2):
+
+```bash
+chmod +x fetch_msg.sh
+./fetch_msg.sh 5 msg.txt
+cat msg.txt
+```
+
+Or directly:
+
+```bash
+./venv/bin/python check_channel.py -n 5 -o msg.txt
+```
+
 ### Daemon: new messages (local test)
 
 ```bash
