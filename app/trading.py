@@ -96,26 +96,14 @@ def _process_signal_row_sync(row: dict[str, Any], cfg: dict) -> dict[str, Any] |
     if not plan or plan.sl is None:
         return {"action": "skipped", "reason": "could not build trade plan"}
 
-    order_type = plan.side
-    if signal.entry_min is not None and signal.entry_max is not None:
-        mid = (signal.entry_min + signal.entry_max) / 2
-        order_type = "buy_limit" if plan.side == "buy" else "sell_limit"
-        result = client.place_order(
-            order_type=order_type,
-            volume=float(cfg["volume"]),
-            sl=plan.sl,
-            tp=plan.tp,
-            price=mid,
-            comment=trade_comment,
-        )
-    else:
-        result = client.place_order(
-            order_type=order_type,
-            volume=float(cfg["volume"]),
-            sl=plan.sl,
-            tp=plan.tp,
-            comment=trade_comment,
-        )
+    # Always market orders; ignore AT / FROM entry prices in messages.
+    result = client.place_order(
+        order_type=plan.side,
+        volume=float(cfg["volume"]),
+        sl=plan.sl,
+        tp=plan.tp,
+        comment=trade_comment,
+    )
 
     return {
         "action": "open",
