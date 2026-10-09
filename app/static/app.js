@@ -164,17 +164,24 @@ function renderNews(data) {
   }
   const events = data.events || [];
   if (!events.length) {
-    list.innerHTML = "<li class='muted'>No high-impact USD news in window.</li>";
+    list.innerHTML =
+      "<li class='muted'>No upcoming USD calendar events in the next lookahead window. Try Refresh or widen hours in Settings.</li>";
     return;
   }
+  const impactIcon = (imp) =>
+    imp === "High" ? "📕" : imp === "Medium" ? "🟠" : imp === "Low" ? "🟡" : "📅";
   list.innerHTML = events
     .map((e) => {
       const mins = e.minutes_until != null ? `${e.minutes_until}m` : "—";
       const fp = [e.forecast, e.previous].filter((x) => x && x !== "—").join(" / ");
-      const meta = fp ? `F/P: ${escapeHtml(fp)} · in ${mins}` : `in ${mins}`;
-      return `<li>
+      const imp = e.impact || "—";
+      const meta = fp
+        ? `${escapeHtml(imp)} · F/P: ${escapeHtml(fp)} · in ${mins}`
+        : `${escapeHtml(imp)} · in ${mins}`;
+      const past = e.is_past ? " news-past" : "";
+      return `<li class="${past}">
         <span class="news-time">${escapeHtml(e.time_ist || e.time || "—")}</span>
-        <span class="news-title">📕 ${escapeHtml(e.currency || "USD")} ${escapeHtml(e.title || "")}</span>
+        <span class="news-title">${impactIcon(imp)} ${escapeHtml(e.currency || "USD")} ${escapeHtml(e.title || "")}</span>
         <span class="news-meta">${meta}</span>
       </li>`;
     })

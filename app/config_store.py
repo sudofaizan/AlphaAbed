@@ -38,6 +38,7 @@ DEFAULTS = {
     "news_calendar_enabled": True,
     "news_hours_ahead": 72,
     "news_impact": "High",
+    "news_display_impacts": "High,Medium,Low",
     "news_currency": "USD",
     "news_refresh_sec": 300,
     "capiffy_news_blackout": True,

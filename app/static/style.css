@@ -336,6 +336,7 @@ input:focus {
   gap: 0.35rem 1rem;
 }
 .news-list .news-title { font-weight: 600; color: var(--text); }
+.news-list li.news-past { opacity: 0.55; }
 .news-blackout {
   background: rgba(255, 107, 53, 0.1);
   border: 1px solid rgba(255, 107, 53, 0.45);
