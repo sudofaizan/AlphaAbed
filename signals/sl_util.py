@@ -1,5 +1,7 @@
 """Interpret SL values from channel messages (price vs points)."""
 
+from __future__ import annotations
+
 
 def sl_message_is_points(sl: float | None, entry: float, unit: str) -> bool:
     if sl is None:

@@ -8,11 +8,11 @@ from datetime import datetime, timezone
 
 from app.async_io import run_blocking
 from app.config_store import load_config
-from app.dual_trade import test_capiffy_connection
+from app.dual_trade import test_capiffy_connection, test_mt5_account
+from app.mt5_accounts import list_enabled_mt5_accounts
 from app.news_service import maybe_refresh_news
 from app.state import state
 from app.telegram_service import test_telegram
-from app.mt5_accounts import list_enabled_mt5_accounts, test_mt5_account
 
 log = logging.getLogger("alphaabed.connectivity")
 
