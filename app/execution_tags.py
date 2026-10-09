@@ -60,6 +60,33 @@ def _tag(platform_id: str, label: str, status: str, detail: Optional[str] = None
     return out
 
 
+def _mt5_leg_tags(legs: dict[str, Any], *, mt5_on: bool) -> tuple[list[dict[str, Any]], list[str]]:
+    tags: list[dict[str, Any]] = []
+    errors: list[str] = []
+    if not mt5_on:
+        return tags, errors
+    mt5_legs = [(k, v) for k, v in legs.items() if k.startswith("mt5:")]
+    if not mt5_legs and legs.get("mt5"):
+        mt5_legs = [("mt5", legs["mt5"])]
+    if not mt5_legs:
+        tags.append(_tag("mt5", "MT5", "failed", "no response"))
+        errors.append("MT5: no response")
+        return tags, errors
+    for key, leg in mt5_legs:
+        label = leg.get("label") or key.replace("mt5:", "MT5 ")
+        tag_id = key if key.startswith("mt5:") else "mt5"
+        if leg.get("ok") and _mt5_result_ok(leg.get("result")):
+            tags.append(_tag(tag_id, label, "success"))
+        elif leg:
+            msg = leg.get("error") or _mt5_error_text(leg.get("result"))
+            tags.append(_tag(tag_id, label, "failed", msg))
+            errors.append(f"{label}: {msg}")
+        else:
+            tags.append(_tag(tag_id, label, "failed", "no response"))
+            errors.append(f"{label}: no response")
+    return tags, errors
+
+
 def summarize_trade_execution(trade: dict[str, Any], cfg: dict) -> dict[str, Any]:
     """Tags for lower-right of signal card: MT5 / CAPIFY success or errors."""
     action = trade.get("action", "")
@@ -89,17 +116,9 @@ def summarize_trade_execution(trade: dict[str, Any], cfg: dict) -> dict[str, Any
         bundle = trade.get("result") or {}
         legs = bundle.get("legs") or {}
 
-        if mt5_on:
-            leg = legs.get("mt5")
-            if leg and leg.get("ok") and _mt5_result_ok(leg.get("result")):
-                tags.append(_tag("mt5", "MT5", "success"))
-            elif leg:
-                msg = leg.get("error") or _mt5_error_text(leg.get("result"))
-                tags.append(_tag("mt5", "MT5", "failed", msg))
-                errors.append(f"MT5: {msg}")
-            else:
-                tags.append(_tag("mt5", "MT5", "failed", "no response"))
-                errors.append("MT5: no response")
+        mt5_tags, mt5_errs = _mt5_leg_tags(legs, mt5_on=mt5_on)
+        tags.extend(mt5_tags)
+        errors.extend(mt5_errs)
 
         if capiffy_on:
             leg = legs.get("capiffy")
@@ -124,30 +143,31 @@ def summarize_trade_execution(trade: dict[str, Any], cfg: dict) -> dict[str, Any
         return {"processed": processed, "action": action, "tags": tags, "errors": errors}
 
     if action in ("close_all", "partial_close"):
-        # Capiffy: open-only — no close tag on close_all (MT5 only).
         if action == "close_all":
             bundle = trade.get("result") or {}
             legs = bundle.get("legs") or {}
-            leg = legs.get("mt5")
-            if mt5_on:
-                if leg and leg.get("ok") and _mt5_result_ok(leg.get("result")):
-                    tags.insert(0, _tag("mt5", "MT5", "success"))
-                elif leg:
-                    msg = leg.get("error") or _mt5_error_text(leg.get("result"))
-                    tags.insert(0, _tag("mt5", "MT5", "failed", msg))
-                    errors.append(f"MT5: {msg}")
+            mt5_tags, mt5_errs = _mt5_leg_tags(legs, mt5_on=mt5_on)
+            tags.extend(mt5_tags)
+            errors.extend(mt5_errs)
         else:
-            res = trade.get("result")
-            if mt5_on:
-                if _mt5_result_ok(res):
-                    tags.insert(0, _tag("mt5", "MT5", "success"))
-                else:
-                    msg = _mt5_error_text(res)
-                    tags.insert(0, _tag("mt5", "MT5", "failed", msg))
-                    errors.append(f"MT5: {msg}")
+            bundle = trade.get("result") or {}
+            legs = bundle.get("legs") or {}
+            if isinstance(legs, dict) and any(k.startswith("mt5:") for k in legs):
+                mt5_tags, mt5_errs = _mt5_leg_tags(legs, mt5_on=mt5_on)
+                tags.extend(mt5_tags)
+                errors.extend(mt5_errs)
+            else:
+                res = trade.get("result")
+                if mt5_on:
+                    if _mt5_result_ok(res):
+                        tags.insert(0, _tag("mt5", "MT5", "success"))
+                    else:
+                        msg = _mt5_error_text(res)
+                        tags.insert(0, _tag("mt5", "MT5", "failed", msg))
+                        errors.append(f"MT5: {msg}")
 
-        mt5_tags = [t for t in tags if t["id"] == "mt5"]
-        processed = bool(mt5_tags) and all(t["status"] == "success" for t in mt5_tags)
+        mt5_tags_only = [t for t in tags if t["id"].startswith("mt5")]
+        processed = bool(mt5_tags_only) and all(t["status"] == "success" for t in mt5_tags_only)
         return {"processed": processed, "action": action, "tags": tags, "errors": errors}
 
     return {"processed": False, "action": action, "tags": [], "errors": []}

@@ -19,7 +19,9 @@ from app.config_store import load_config, save_config
 from app.datetime_util import enrich_date_ist
 from app.state import state
 from app.telegram_service import test_telegram, fetch_and_classify
-from app.dual_trade import test_capiffy_connection
+from app.dual_trade import test_capiffy_connection, test_mt5_account
+from app.lot_sizing import compute_trade_volumes, sl_points_for_volume
+from app.mt5_accounts import list_enabled_mt5_accounts, normalize_mt5_accounts, primary_mt5_client
 from app.test_trade import test_close_all, test_market_open
 from app.connectivity import (
     connectivity_loop,
@@ -33,7 +35,6 @@ from app.news_blackout import blackout_status
 from app.news_service import get_news_snapshot, refresh_news_sync
 from app.ui_auth import create_session, revoke_session, verify_password, verify_session
 from app.worker import refresh_history_once, worker_loop
-from signals.alphafx_client import AlphaFxClient, AlphaFxConfig
 from signals.trade_plan import build_trade_plan
 
 logging.basicConfig(level=logging.INFO)
@@ -52,6 +53,10 @@ class ConfigUpdate(BaseModel):
     mt5_symbol: Optional[str] = None
     mt5_trade_comment: Optional[str] = None
     volume: Optional[float] = None
+    lot_mode: Optional[str] = None
+    risk_usd: Optional[float] = None
+    sl_message_unit: Optional[str] = None
+    mt5_accounts: Optional[list[dict[str, Any]]] = None
     reward_risk_ratio: Optional[float] = None
     prefer_signal_tp: Optional[bool] = None
     auto_trade: Optional[bool] = None
@@ -223,7 +228,10 @@ async def get_config():
 
 @app.put("/api/config")
 async def put_config(body: ConfigUpdate):
-    updates = {k: v for k, v in body.model_dump().items() if v is not None}
+    raw = body.model_dump()
+    updates = {k: v for k, v in raw.items() if v is not None}
+    if raw.get("mt5_accounts") is not None:
+        updates["mt5_accounts"] = raw["mt5_accounts"]
     cfg = save_config(updates)
     return {
         "ok": True,
@@ -269,31 +277,54 @@ async def api_test_capiffy():
 @app.post("/api/test/mt5")
 async def api_test_mt5():
     cfg = load_config()
-    client = AlphaFxClient(
-        AlphaFxConfig(
-            base_url=cfg["mt5_base_url"],
-            api_key=cfg["mt5_api_key"],
-            symbol=cfg["mt5_symbol"],
-        )
+    accounts = list_enabled_mt5_accounts(cfg)
+    if not accounts:
+        return {"ok": False, "error": "No MT5 accounts configured"}
+    results = []
+    for acc in accounts:
+        results.append(await run_blocking(test_mt5_account, acc))
+    ok = all(r.get("ok") for r in results)
+    err = None if ok else (results[0].get("error") or "MT5 check failed")
+    primary = results[0]
+    record_mt5(
+        ok,
+        err,
+        primary.get("account") if primary.get("ok") else None,
     )
-    health = await run_blocking(client.health)
-    account = await run_blocking(client.account_health)
-    price = await run_blocking(client.get_price)
-    ok = bool(health.get("ok")) and bool(account.get("ok"))
-    err = None if ok else (health.get("error") or account.get("error"))
-    record_mt5(ok, err, account if account.get("ok") else None)
-    return {"ok": ok, "health": health, "account": account, "price": price}
+    return {"ok": ok, "error": err, "accounts": results}
+
+
+@app.post("/api/test/mt5/account")
+async def api_test_mt5_account(body: dict[str, Any]):
+    """Test one MT5 account (by id from saved config or inline account object)."""
+    cfg = load_config()
+    acc_id = body.get("id")
+    account = body.get("account")
+    if account and isinstance(account, dict):
+        target = normalize_mt5_accounts({"mt5_accounts": [account]})["mt5_accounts"][0]
+    elif acc_id:
+        target = next((a for a in cfg["mt5_accounts"] if a["id"] == acc_id), None)
+        if not target:
+            return {"ok": False, "error": "account id not found"}
+    else:
+        return {"ok": False, "error": "provide id or account object"}
+    result = await run_blocking(test_mt5_account, target)
+    if acc_id == cfg["mt5_accounts"][0].get("id") or not acc_id:
+        record_mt5(
+            bool(result.get("ok")),
+            result.get("error"),
+            result.get("account") if result.get("ok") else None,
+        )
+    return result
 
 
 @app.get("/api/account")
 async def api_account():
     cfg = load_config()
-    client = AlphaFxClient(
-        AlphaFxConfig(cfg["mt5_base_url"], cfg["mt5_api_key"], cfg["mt5_symbol"])
-    )
+    client = primary_mt5_client(cfg)
     account = await run_blocking(client.account_health)
     price = await run_blocking(client.get_price)
-    return {"account": account, "price": price}
+    return {"account": account, "price": price, "mt5_account_count": len(list_enabled_mt5_accounts(cfg))}
 
 
 @app.post("/api/signals/refresh")
@@ -329,12 +360,12 @@ async def api_preview(body: PreviewBody):
         "reason": parsed.reason,
     }
     if parsed.signal:
-        client = AlphaFxClient(
-            AlphaFxConfig(cfg["mt5_base_url"], cfg["mt5_api_key"], cfg["mt5_symbol"])
-        )
+        client = primary_mt5_client(cfg)
         price = await run_blocking(client.get_price)
         if price.get("ok") and parsed.kind in ("open_signal", "incomplete_signal"):
             sig = parsed.signal
+            point = float(price.get("point") or 0.01)
+            sl_unit = str(cfg.get("sl_message_unit") or "auto")
             plan = build_trade_plan(
                 sig,
                 bid=float(price["bid"]),
@@ -344,9 +375,28 @@ async def api_preview(body: PreviewBody):
                 default_sl_points=float(cfg["default_sl_points"])
                 if cfg.get("allow_trade_without_sl")
                 else None,
-                point=float(price.get("point") or 0.01),
+                point=point,
+                sl_message_unit=sl_unit,
             )
             if plan:
                 out["trade_plan"] = plan.__dict__
+                try:
+                    mt5_v, cap_v, sizing = compute_trade_volumes(
+                        cfg, signal=sig, plan=plan, point=point
+                    )
+                    out["sizing"] = {**sizing, "mt5_volume": mt5_v, "capiffy_volume": cap_v}
+                except ValueError as exc:
+                    out["sizing_error"] = str(exc)
+                pts = sl_points_for_volume(
+                    signal=sig,
+                    plan=plan,
+                    point=point,
+                    default_sl_points=float(cfg["default_sl_points"])
+                    if cfg.get("default_sl_points")
+                    else None,
+                    sl_message_unit=sl_unit,
+                )
+                if pts:
+                    out["sl_points"] = pts
         out["price"] = price
     return out

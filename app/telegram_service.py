@@ -17,7 +17,7 @@ from telethon.errors import ChannelInvalidError, ChannelPrivateError, UsernameIn
 
 from signals.classify import classify_text, format_signal_line
 from signals.trade_plan import build_trade_plan
-from signals.alphafx_client import AlphaFxClient, AlphaFxConfig
+from app.mt5_accounts import primary_mt5_client
 from telegram_util import build_client, require_env
 
 
@@ -97,13 +97,7 @@ async def fetch_and_classify(limit: int, cfg: dict) -> dict[str, Any]:
     all_rows: list[dict] = []
     signals: list[dict] = []
 
-    mt5 = AlphaFxClient(
-        AlphaFxConfig(
-            base_url=cfg["mt5_base_url"],
-            api_key=cfg["mt5_api_key"],
-            symbol=cfg["mt5_symbol"],
-        )
-    )
+    mt5 = primary_mt5_client(cfg)
     price_resp = await run_blocking(mt5.get_price)
     bid = float(price_resp.get("bid", 0) or 0)
     ask = float(price_resp.get("ask", 0) or 0)
@@ -154,6 +148,7 @@ async def fetch_and_classify(limit: int, cfg: dict) -> dict[str, Any]:
                         prefer_signal_tp=bool(cfg["prefer_signal_tp"]),
                         default_sl_points=default_sl,
                         point=point,
+                        sl_message_unit=str(cfg.get("sl_message_unit") or "auto"),
                     )
                     if plan:
                         row["trade_plan"] = plan.__dict__

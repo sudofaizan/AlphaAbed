@@ -1,4 +1,4 @@
-"""Execute MT5 and Capiffy legs in parallel (not sequential)."""
+"""Execute MT5 (all accounts) and Capiffy legs in parallel."""
 
 from __future__ import annotations
 
@@ -7,8 +7,12 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable, Optional
 
 from app.capiffy import client as capiffy_client
+from app.mt5_accounts import (
+    leg_key_for_account,
+    list_enabled_mt5_accounts,
+    mt5_client_for_account,
+)
 from app.news_blackout import capiffy_news_blackout
-from signals.alphafx_client import AlphaFxClient, AlphaFxConfig
 from signals.trade_plan import TradePlan
 
 log = logging.getLogger("alphaabed.dual_trade")
@@ -48,18 +52,8 @@ def _run_parallel(jobs: list[tuple[str, Callable[[], Any]]]) -> dict[str, Any]:
     return out
 
 
-def mt5_client_from_cfg(cfg: dict) -> AlphaFxClient:
-    return AlphaFxClient(
-        AlphaFxConfig(
-            base_url=cfg["mt5_base_url"],
-            api_key=cfg["mt5_api_key"],
-            symbol=cfg["mt5_symbol"],
-        )
-    )
-
-
 def should_trade_mt5(cfg: dict) -> bool:
-    return bool(cfg.get("trade_mt5", True))
+    return bool(cfg.get("trade_mt5", True)) and bool(list_enabled_mt5_accounts(cfg))
 
 
 def should_trade_capiffy(cfg: dict) -> bool:
@@ -85,18 +79,23 @@ def open_market_parallel(
     legs: dict[str, Any] = {}
 
     if should_trade_mt5(cfg):
+        for acc in list_enabled_mt5_accounts(cfg):
+            acc_id = acc["id"]
+            label = acc.get("label") or acc_id
+            key = leg_key_for_account(acc_id)
 
-        def _mt5() -> Any:
-            client = mt5_client_from_cfg(cfg)
-            return client.place_order(
-                order_type=plan.side,
-                volume=mt5_vol,
-                sl=plan.sl,
-                tp=plan.tp,
-                comment=comment,
-            )
+            def _mt5(a=acc) -> Any:
+                client = mt5_client_for_account(a)
+                return client.place_order(
+                    order_type=plan.side,
+                    volume=mt5_vol,
+                    sl=plan.sl,
+                    tp=plan.tp,
+                    comment=comment,
+                )
 
-        jobs.append(("mt5", _mt5))
+            jobs.append((key, _mt5))
+            legs[key] = {"account_id": acc_id, "label": label}
 
     cap_blocked = False
     cap_block_reason = ""
@@ -126,10 +125,16 @@ def open_market_parallel(
             jobs.append(("capiffy", _cap))
 
     parallel = _run_parallel(jobs)
-    legs.update(parallel)
+    for key, leg in parallel.items():
+        base = legs.get(key, {})
+        base.update(leg)
+        legs[key] = base
+
     ok_parts = [leg.get("ok") for leg in legs.values() if not leg.get("skipped")]
     ok = all(ok_parts) if ok_parts else (not jobs and not cap_blocked)
-    if cap_blocked and legs.get("mt5", {}).get("ok"):
+    if cap_blocked and any(
+        k.startswith("mt5:") and legs.get(k, {}).get("ok") for k in legs
+    ):
         ok = True
     out: dict[str, Any] = {"ok": ok, "legs": legs, "plan": plan.__dict__}
     if cap_blocked:
@@ -138,7 +143,7 @@ def open_market_parallel(
 
 
 def close_all_parallel(cfg: dict) -> dict[str, Any]:
-    """Close MT5 only — Capiffy positions must be closed manually on capiffy.com."""
+    """Close MT5 on every enabled account — Capiffy manual only."""
     comment = (cfg.get("mt5_trade_comment") or "ABD").strip()[:31]
     jobs: list[tuple[str, Callable[[], Any]]] = []
     capiffy_note: Optional[str] = None
@@ -147,11 +152,14 @@ def close_all_parallel(cfg: dict) -> dict[str, Any]:
         capiffy_note = "Capiffy close skipped (XAUBeast opens only; close on Capiffy UI)"
 
     if should_trade_mt5(cfg):
+        for acc in list_enabled_mt5_accounts(cfg):
+            key = leg_key_for_account(acc["id"])
 
-        def _mt5() -> Any:
-            return mt5_client_from_cfg(cfg).close_all(cfg["mt5_symbol"], comment=comment)
+            def _close(a=acc) -> Any:
+                sym = a.get("symbol") or cfg["mt5_symbol"]
+                return mt5_client_for_account(a).close_all(sym, comment=comment)
 
-        jobs.append(("mt5", _mt5))
+            jobs.append((key, _close))
 
     legs = _run_parallel(jobs)
     ok = all(leg.get("ok") for leg in legs.values()) if legs else False
@@ -161,9 +169,20 @@ def close_all_parallel(cfg: dict) -> dict[str, Any]:
     return out
 
 
-def partial_close_mt5(cfg: dict, volume: float) -> dict[str, Any]:
+def partial_close_all_mt5(cfg: dict, volume: float) -> dict[str, Any]:
     comment = (cfg.get("mt5_trade_comment") or "ABD").strip()[:31]
-    return mt5_client_from_cfg(cfg).close_partial(cfg["mt5_symbol"], volume, comment=comment)
+    jobs: list[tuple[str, Callable[[], Any]]] = []
+    for acc in list_enabled_mt5_accounts(cfg):
+        key = leg_key_for_account(acc["id"])
+
+        def _partial(a=acc) -> Any:
+            sym = a.get("symbol") or cfg["mt5_symbol"]
+            return mt5_client_for_account(a).close_partial(sym, volume, comment=comment)
+
+        jobs.append((key, _partial))
+    legs = _run_parallel(jobs)
+    ok = all(leg.get("ok") for leg in legs.values()) if legs else False
+    return {"ok": ok, "legs": legs}
 
 
 def test_capiffy_connection(cfg: dict) -> dict[str, Any]:
@@ -185,3 +204,21 @@ def test_capiffy_connection(cfg: dict) -> dict[str, Any]:
         }
     except Exception as exc:
         return {"ok": False, "error": str(exc)}
+
+
+def test_mt5_account(account: dict[str, Any]) -> dict[str, Any]:
+    client = mt5_client_for_account(account)
+    health = client.health()
+    acct = client.account_health()
+    price = client.get_price()
+    ok = bool(health.get("ok")) and bool(acct.get("ok"))
+    err = None if ok else (health.get("error") or acct.get("error") or "MT5 check failed")
+    return {
+        "ok": ok,
+        "error": err,
+        "account_id": account.get("id"),
+        "label": account.get("label"),
+        "health": health,
+        "account": acct,
+        "price": price,
+    }

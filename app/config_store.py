@@ -9,6 +9,8 @@ from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 
+from app.mt5_accounts import normalize_mt5_accounts
+
 DEFAULTS = {
     "poll_interval_sec": 1,
     "telegram_realtime": True,
@@ -18,6 +20,10 @@ DEFAULTS = {
     "mt5_symbol": "XAUUSD.pr",
     "mt5_trade_comment": "ABD",
     "volume": 0.1,
+    "lot_mode": "fixed",
+    "risk_usd": 30.0,
+    "sl_message_unit": "auto",
+    "mt5_accounts": [],
     "reward_risk_ratio": 2.0,
     "prefer_signal_tp": False,
     "auto_trade": False,
@@ -58,7 +64,7 @@ def _ensure_dir() -> None:
 def _load_config_unlocked() -> dict:
     _ensure_dir()
     if not _path.exists():
-        return deepcopy(DEFAULTS)
+        return normalize_mt5_accounts(deepcopy(DEFAULTS))
     try:
         data = json.loads(_path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
@@ -72,7 +78,7 @@ def _load_config_unlocked() -> dict:
             ).isoformat()
         except OSError:
             pass
-    return merged
+    return normalize_mt5_accounts(merged)
 
 
 def load_config() -> dict:
@@ -86,6 +92,7 @@ def save_config(updates: dict) -> dict:
         for key, val in updates.items():
             if key in DEFAULTS:
                 cfg[key] = val
+        cfg = normalize_mt5_accounts(cfg)
         saved_at = datetime.now(timezone.utc).isoformat()
         cfg["config_saved_at"] = saved_at
         _path.write_text(json.dumps(cfg, indent=2), encoding="utf-8")

@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 from app.datetime_util import format_card_time_ist
-from signals.alphafx_client import AlphaFxClient, AlphaFxConfig
+from app.mt5_accounts import primary_mt5_client
 
 log = logging.getLogger("alphaabed.news")
 
@@ -22,15 +22,8 @@ _cache: dict[str, Any] = {
 }
 
 
-def _client_from_cfg(cfg: dict) -> AlphaFxClient:
-    return AlphaFxClient(
-        AlphaFxConfig(
-            base_url=cfg["mt5_base_url"],
-            api_key=cfg["mt5_api_key"],
-            symbol=cfg.get("mt5_symbol") or "XAUUSD.pr",
-            timeout=15,
-        )
-    )
+def _client_from_cfg(cfg: dict):
+    return primary_mt5_client(cfg)
 
 
 def _enrich_event(ev: dict[str, Any]) -> dict[str, Any]:

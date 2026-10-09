@@ -12,7 +12,7 @@ from app.dual_trade import test_capiffy_connection
 from app.news_service import maybe_refresh_news
 from app.state import state
 from app.telegram_service import test_telegram
-from signals.alphafx_client import AlphaFxClient, AlphaFxConfig
+from app.mt5_accounts import list_enabled_mt5_accounts, test_mt5_account
 
 log = logging.getLogger("alphaabed.connectivity")
 
@@ -59,21 +59,25 @@ def record_capiffy(ok: bool | None, error: str | None = None) -> None:
 
 
 async def check_mt5(cfg: dict) -> dict:
-    client = AlphaFxClient(
-        AlphaFxConfig(
-            base_url=cfg["mt5_base_url"],
-            api_key=cfg["mt5_api_key"],
-            symbol=cfg["mt5_symbol"],
-        )
-    )
-    health = await run_blocking(client.health)
-    account = await run_blocking(client.account_health)
-    ok = bool(health.get("ok")) and bool(account.get("ok"))
+    accounts = list_enabled_mt5_accounts(cfg)
+    if not accounts:
+        record_mt5(False, "No MT5 accounts configured")
+        return {"ok": False, "error": "No MT5 accounts configured"}
+
+    results = []
+    for acc in accounts:
+        r = await run_blocking(test_mt5_account, acc)
+        results.append(r)
+
+    ok = all(r.get("ok") for r in results)
     err = None
     if not ok:
-        err = health.get("error") or account.get("error") or "MT5 check failed"
-    record_mt5(ok, err, account if account.get("ok") else None)
-    return {"ok": ok, "error": err}
+        failed = [r for r in results if not r.get("ok")]
+        err = failed[0].get("error") or "MT5 check failed"
+    primary = results[0]
+    acct = primary.get("account") if primary.get("ok") else None
+    record_mt5(ok, err, acct if isinstance(acct, dict) and acct.get("ok") else None)
+    return {"ok": ok, "error": err, "accounts": results}
 
 
 async def run_connectivity_checks(cfg: dict | None = None) -> None:

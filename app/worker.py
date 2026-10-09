@@ -17,19 +17,13 @@ from app.telegram_service import (
 from app.connectivity import record_mt5, record_telegram
 from app.execution_tags import summarize_trade_execution
 from app.trading import process_signal_row
-from signals.alphafx_client import AlphaFxClient, AlphaFxConfig
+from app.mt5_accounts import primary_mt5_client
 
 log = logging.getLogger("alphaabed.worker")
 
 
 async def refresh_account_metrics(cfg: dict) -> None:
-    client = AlphaFxClient(
-        AlphaFxConfig(
-            base_url=cfg["mt5_base_url"],
-            api_key=cfg["mt5_api_key"],
-            symbol=cfg["mt5_symbol"],
-        )
-    )
+    client = primary_mt5_client(cfg)
     health = await run_blocking(client.account_health)
     ok = bool(health.get("ok"))
     err = health.get("error") if not ok else None

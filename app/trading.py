@@ -6,8 +6,9 @@ import logging
 from typing import Any
 
 from app.async_io import run_blocking
-from app.dual_trade import close_all_parallel, open_market_parallel, partial_close_mt5
-from signals.alphafx_client import AlphaFxClient, AlphaFxConfig
+from app.dual_trade import close_all_parallel, open_market_parallel, partial_close_all_mt5
+from app.lot_sizing import compute_trade_volumes
+from app.mt5_accounts import primary_mt5_client
 from signals.classify import TradeSignal, classify_text, merge_sl_fragment
 from signals.trade_plan import build_trade_plan
 
@@ -39,13 +40,7 @@ def _process_signal_row_sync(row: dict[str, Any], cfg: dict) -> dict[str, Any] |
     if not cfg.get("auto_trade"):
         return {"action": "skipped", "reason": "auto_trade disabled", "kind": kind}
 
-    client = AlphaFxClient(
-        AlphaFxConfig(
-            base_url=cfg["mt5_base_url"],
-            api_key=cfg["mt5_api_key"],
-            symbol=cfg["mt5_symbol"],
-        )
-    )
+    client = primary_mt5_client(cfg)
 
     if kind == "close_all":
         return {"action": "close_all", "result": close_all_parallel(cfg)}
@@ -54,7 +49,7 @@ def _process_signal_row_sync(row: dict[str, Any], cfg: dict) -> dict[str, Any] |
         vol = float(cfg["volume"]) / 2
         return {
             "action": "partial_close",
-            "result": partial_close_mt5(cfg, vol),
+            "result": partial_close_all_mt5(cfg, vol),
         }
 
     if not parsed.signal:
@@ -72,6 +67,7 @@ def _process_signal_row_sync(row: dict[str, Any], cfg: dict) -> dict[str, Any] |
     ask = float(price["ask"])
     point = float(price.get("point") or 0.01)
     default_sl = float(cfg["default_sl_points"]) if signal.sl is None else None
+    sl_unit = str(cfg.get("sl_message_unit") or "auto")
 
     plan = build_trade_plan(
         signal,
@@ -81,16 +77,24 @@ def _process_signal_row_sync(row: dict[str, Any], cfg: dict) -> dict[str, Any] |
         prefer_signal_tp=bool(cfg["prefer_signal_tp"]),
         default_sl_points=default_sl,
         point=point,
+        sl_message_unit=sl_unit,
     )
     if not plan or plan.sl is None:
         return {"action": "skipped", "reason": "could not build trade plan"}
 
-    # Always market orders; MT5 + Capiffy fire in parallel when both enabled.
-    result = open_market_parallel(cfg, plan)
+    try:
+        mt5_vol, cap_vol, sizing_meta = compute_trade_volumes(
+            cfg, signal=signal, plan=plan, point=point
+        )
+    except ValueError as exc:
+        return {"action": "skipped", "reason": str(exc)}
+
+    result = open_market_parallel(cfg, plan, mt5_volume=mt5_vol, capiffy_volume=cap_vol)
 
     return {
         "action": "open",
         "plan": plan.__dict__,
+        "sizing": sizing_meta,
         "result": result,
         "message_id": row.get("message_id"),
     }
