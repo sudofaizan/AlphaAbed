@@ -67,8 +67,6 @@ def _process_signal_row_sync(row: dict[str, Any], cfg: dict) -> dict[str, Any] |
     ask = float(price["ask"])
     point = float(price.get("point") or 0.01)
     default_sl = float(cfg["default_sl_points"]) if signal.sl is None else None
-    sl_unit = str(cfg.get("sl_message_unit") or "auto")
-
     plan = build_trade_plan(
         signal,
         bid=bid,
@@ -77,7 +75,6 @@ def _process_signal_row_sync(row: dict[str, Any], cfg: dict) -> dict[str, Any] |
         prefer_signal_tp=bool(cfg["prefer_signal_tp"]),
         default_sl_points=default_sl,
         point=point,
-        sl_message_unit=sl_unit,
     )
     if not plan or plan.sl is None:
         return {"action": "skipped", "reason": "could not build trade plan"}

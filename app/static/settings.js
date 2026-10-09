@@ -111,7 +111,6 @@ function renderCurrentSettings(cfg) {
     ["Use signal TP", yn(cfg.prefer_signal_tp)],
     ["Trade without SL", yn(cfg.allow_trade_without_sl)],
     ["Default SL points", cfg.default_sl_points ?? "—"],
-    ["SL message unit", cfg.sl_message_unit ?? "auto"],
     ["History fetch limit", cfg.telegram_fetch_limit ?? "—"],
   ];
   document.getElementById("currentSettings").innerHTML = rows

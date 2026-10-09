@@ -22,7 +22,6 @@ DEFAULTS = {
     "volume": 0.1,
     "lot_mode": "fixed",
     "risk_usd": 30.0,
-    "sl_message_unit": "auto",
     "mt5_accounts": [],
     "reward_risk_ratio": 2.0,
     "prefer_signal_tp": False,

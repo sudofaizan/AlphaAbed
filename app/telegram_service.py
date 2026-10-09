@@ -148,7 +148,6 @@ async def fetch_and_classify(limit: int, cfg: dict) -> dict[str, Any]:
                         prefer_signal_tp=bool(cfg["prefer_signal_tp"]),
                         default_sl_points=default_sl,
                         point=point,
-                        sl_message_unit=str(cfg.get("sl_message_unit") or "auto"),
                     )
                     if plan:
                         row["trade_plan"] = plan.__dict__

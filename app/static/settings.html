@@ -66,14 +66,7 @@
         </label>
         <label>Fixed MT5 lot<input name="volume" type="number" step="0.001" min="0.01" /></label>
         <label>Risk per trade ($)<input name="risk_usd" type="number" step="1" min="1" /></label>
-        <label>SL in message means
-          <select name="sl_message_unit">
-            <option value="auto">Auto (price vs points)</option>
-            <option value="points">Points (e.g. SL 1250)</option>
-            <option value="price">Price level (e.g. SL 2650)</option>
-          </select>
-        </label>
-        <p class="muted lot-hint">$-risk: lot ≈ risk_usd ÷ SL points (price from primary MT5). All MT5 + Capiffy use the same lot, opened in parallel.</p>
+        <p class="muted lot-hint">Telegram <code>SL</code> is always the XAU stop <strong>price</strong>. In $-risk mode: SL points = |live entry − SL price| ÷ MT5 point; lot ≈ risk_usd ÷ SL points. Same lot on all MT5 + Capiffy in parallel.</p>
         <label class="check"><input name="trade_mt5" type="checkbox" /> Auto-trade on MT5 (all enabled accounts)</label>
         <label class="check"><input name="capiffy_enabled" type="checkbox" /> Capiffy enabled</label>
         <label class="check"><input name="trade_capiffy" type="checkbox" /> Auto-trade on Capiffy</label>

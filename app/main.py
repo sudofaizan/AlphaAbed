@@ -20,7 +20,7 @@ from app.datetime_util import enrich_date_ist
 from app.state import state
 from app.telegram_service import test_telegram, fetch_and_classify
 from app.dual_trade import test_capiffy_connection, test_mt5_account
-from app.lot_sizing import compute_trade_volumes, sl_points_for_volume
+from app.lot_sizing import compute_trade_volumes, sl_points_from_plan
 from app.mt5_accounts import list_enabled_mt5_accounts, normalize_mt5_accounts, primary_mt5_client
 from app.test_trade import test_close_all, test_market_open
 from app.connectivity import (
@@ -55,7 +55,6 @@ class ConfigUpdate(BaseModel):
     volume: Optional[float] = None
     lot_mode: Optional[str] = None
     risk_usd: Optional[float] = None
-    sl_message_unit: Optional[str] = None
     mt5_accounts: Optional[list[dict[str, Any]]] = None
     reward_risk_ratio: Optional[float] = None
     prefer_signal_tp: Optional[bool] = None
@@ -365,7 +364,6 @@ async def api_preview(body: PreviewBody):
         if price.get("ok") and parsed.kind in ("open_signal", "incomplete_signal"):
             sig = parsed.signal
             point = float(price.get("point") or 0.01)
-            sl_unit = str(cfg.get("sl_message_unit") or "auto")
             plan = build_trade_plan(
                 sig,
                 bid=float(price["bid"]),
@@ -376,10 +374,12 @@ async def api_preview(body: PreviewBody):
                 if cfg.get("allow_trade_without_sl")
                 else None,
                 point=point,
-                sl_message_unit=sl_unit,
             )
             if plan:
                 out["trade_plan"] = plan.__dict__
+                pts = sl_points_from_plan(plan, point)
+                if pts:
+                    out["sl_points"] = round(pts, 2)
                 try:
                     mt5_v, cap_v, sizing = compute_trade_volumes(
                         cfg, signal=sig, plan=plan, point=point
@@ -387,16 +387,5 @@ async def api_preview(body: PreviewBody):
                     out["sizing"] = {**sizing, "mt5_volume": mt5_v, "capiffy_volume": cap_v}
                 except ValueError as exc:
                     out["sizing_error"] = str(exc)
-                pts = sl_points_for_volume(
-                    signal=sig,
-                    plan=plan,
-                    point=point,
-                    default_sl_points=float(cfg["default_sl_points"])
-                    if cfg.get("default_sl_points")
-                    else None,
-                    sl_message_unit=sl_unit,
-                )
-                if pts:
-                    out["sl_points"] = pts
         out["price"] = price
     return out

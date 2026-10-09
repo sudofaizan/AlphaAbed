@@ -54,23 +54,21 @@ def test_market_open(cfg: dict, side: str, platform: str = "mt5") -> dict[str, A
         prefer_signal_tp=bool(cfg.get("prefer_signal_tp")),
         default_sl_points=float(cfg.get("default_sl_points") or 500),
         point=point,
-        sl_message_unit=str(cfg.get("sl_message_unit") or "auto"),
     )
     if not plan or plan.sl is None:
         return {"ok": False, "error": "could not build trade plan"}
 
     lot_mode = (eff.get("lot_mode") or "fixed").lower()
     if lot_mode == "risk_usd":
-        signal.sl = float(cfg.get("default_sl_points") or 500)
+        signal.sl = bid - 50.0 if side == "buy" else ask + 50.0
         plan = build_trade_plan(
             signal,
             bid=bid,
             ask=ask,
             reward_risk_ratio=float(cfg.get("reward_risk_ratio") or 2.0),
             prefer_signal_tp=bool(cfg.get("prefer_signal_tp")),
-            default_sl_points=float(cfg.get("default_sl_points") or 500),
+            default_sl_points=None,
             point=point,
-            sl_message_unit="points",
         )
         if not plan:
             return {"ok": False, "error": "could not build trade plan for risk test"}

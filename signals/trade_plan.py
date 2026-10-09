@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from signals.classify import TradeSignal
-from signals.sl_util import sl_message_is_points
 
 
 @dataclass
@@ -37,16 +36,13 @@ def build_trade_plan(
     prefer_signal_tp: bool,
     default_sl_points: float | None,
     point: float = 0.01,
-    sl_message_unit: str = "auto",
 ) -> TradePlan | None:
     side = signal.side
     entry = _entry_price(side, bid, ask)
 
+    # Telegram SL/TP are always XAUUSD price levels (not point counts).
     sl = signal.sl
-    if sl is not None and sl_message_is_points(sl, entry, sl_message_unit):
-        dist = float(sl) * point
-        sl = entry - dist if side == "buy" else entry + dist
-    elif sl is None and default_sl_points is not None and default_sl_points > 0:
+    if sl is None and default_sl_points is not None and default_sl_points > 0:
         dist = default_sl_points * point
         sl = entry - dist if side == "buy" else entry + dist
 
