@@ -130,3 +130,21 @@ def poll_new_whatsapp_messages(cfg: dict, *, bootstrap: bool = False) -> dict[st
         "new_count": len(rows),
         "rows": rows,
     }
+
+
+def fetch_whatsapp_history_rows(cfg: dict) -> list[dict[str, Any]]:
+    """All open signals from the latest feed batch (for dashboard history, no dedupe)."""
+    url = (cfg.get("whatsapp_messages_url") or "").strip()
+    if not url:
+        return []
+    payload = _fetch_url(url)
+    if payload.get("ok") is False and payload.get("error"):
+        return []
+    messages = list(payload.get("messages") or [])
+    rows: list[dict[str, Any]] = []
+    for msg in messages:
+        row = _msg_to_row(msg)
+        if row.get("kind") == "open_signal":
+            rows.append(row)
+    rows.sort(key=lambda r: r.get("date") or "", reverse=True)
+    return rows

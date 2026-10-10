@@ -36,6 +36,8 @@ from app.datetime_util import format_card_time_ist
 from app.news_blackout import blackout_status
 from app.news_service import get_news_snapshot, refresh_news_sync
 from app.ui_auth import create_session, revoke_session, verify_password, verify_session
+from app.automation_pause import pause_automation, pause_status, resume_automation_now
+from app.past_trades import fetch_past_trades
 from app.worker import refresh_history_once, worker_loop
 from signals.trade_plan import build_trade_plan
 
@@ -93,6 +95,10 @@ class PreviewBody(BaseModel):
 
 class LoginBody(BaseModel):
     password: str
+
+
+class AutomationPauseBody(BaseModel):
+    resume_at: str
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
@@ -181,6 +187,7 @@ async def api_logout(request: Request):
 async def api_status():
     cfg = load_config()
     news_blk = blackout_status(cfg)
+    pause = pause_status(cfg)
     with state.lock:
         tg_at = state.last_telegram_ok_at
         mt5_at = state.last_mt5_ok_at
@@ -220,7 +227,39 @@ async def api_status():
             "last_message_id": state.last_message_id,
             "config": cfg,
             **news_blk,
+            **pause,
         }
+
+
+@app.post("/api/automation/pause")
+async def api_automation_pause(body: AutomationPauseBody):
+    try:
+        cfg = await run_blocking(pause_automation, body.resume_at)
+    except ValueError as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=400)
+    return {"ok": True, "message": "Automation paused", **pause_status(cfg)}
+
+
+@app.post("/api/automation/resume")
+async def api_automation_resume():
+    cfg = await run_blocking(resume_automation_now)
+    return {"ok": True, "message": "Automation resumed", **pause_status(cfg)}
+
+
+@app.get("/api/past-trades")
+async def api_past_trades(days: int | None = Query(None)):
+    cfg = load_config()
+    window = int(days or cfg.get("past_trades_days") or 30)
+    window = max(1, min(window, 366))
+    return await run_blocking(fetch_past_trades, cfg, days=window)
+
+
+@app.post("/api/past-trades/refresh")
+async def api_past_trades_refresh(days: int | None = Query(None)):
+    cfg = load_config()
+    window = int(days or cfg.get("past_trades_days") or 30)
+    window = max(1, min(window, 366))
+    return await run_blocking(fetch_past_trades, cfg, days=window)
 
 
 @app.get("/api/news")

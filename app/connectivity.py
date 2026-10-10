@@ -7,6 +7,7 @@ import logging
 from datetime import datetime, timezone
 
 from app.async_io import run_blocking
+from app.automation_pause import automation_paused, maybe_auto_unpause
 from app.config_store import load_config
 from app.dual_trade import test_capiffy_connection, test_mt5_account
 from app.mt5_accounts import list_enabled_mt5_accounts
@@ -93,6 +94,9 @@ async def check_mt5(cfg: dict) -> dict:
 
 async def run_connectivity_checks(cfg: dict | None = None) -> None:
     cfg = cfg or load_config()
+    cfg = maybe_auto_unpause()
+    if automation_paused(cfg):
+        return
 
     if cfg.get("telegram_enabled", True):
         tg = await test_telegram()

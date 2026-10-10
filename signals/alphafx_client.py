@@ -74,6 +74,29 @@ class AlphaFxClient:
         sym = symbol or self.cfg.symbol
         return self._request("GET", "/getPrice", query={"symbol": sym})
 
+    def get_history(
+        self,
+        *,
+        days: int = 30,
+        start: str | None = None,
+        end: str | None = None,
+        symbol: str | None = None,
+        closed_only: bool = True,
+        limit: int = 10000,
+    ) -> dict:
+        query: dict[str, str | int] = {
+            "days": days,
+            "closed_only": "true" if closed_only else "false",
+            "limit": limit,
+        }
+        if start:
+            query["start"] = start
+        if end:
+            query["end"] = end
+        if symbol:
+            query["symbol"] = symbol
+        return self._request("GET", "/getHistory", query=query)
+
     def get_upcoming_news(
         self,
         *,

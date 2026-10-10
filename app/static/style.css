@@ -458,3 +458,54 @@ code {
   border-radius: 3px;
   font-size: 0.85em;
 }
+
+.worker-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem; }
+.automation-pause {
+  background: rgba(255, 107, 53, 0.12);
+  border: 1px solid rgba(255, 107, 53, 0.45);
+  color: var(--warn);
+  padding: 0.4rem 0.55rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  margin: 0.35rem 0;
+}
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+.modal-panel { max-width: 420px; width: 100%; padding: 1.25rem; }
+.modal-label { display: flex; flex-direction: column; gap: 0.35rem; margin: 1rem 0; }
+.modal-actions { display: flex; gap: 0.5rem; justify-content: flex-end; }
+
+.past-trades-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 1.5rem;
+  margin: 0.75rem 0;
+  font-size: 0.95rem;
+}
+.past-trades-list {
+  max-height: 320px;
+  overflow: auto;
+  font-size: 0.82rem;
+}
+.past-trades-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.past-trades-table th,
+.past-trades-table td {
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid rgba(255, 40, 60, 0.12);
+  text-align: left;
+}
+.past-trades-table th { color: var(--muted); font-weight: 600; }
+.past-trades-table .pnl-win { color: var(--ok); }
+.past-trades-table .pnl-loss { color: var(--bad); }
+.past-trades-error { color: var(--bad); }

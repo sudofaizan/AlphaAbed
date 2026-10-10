@@ -67,10 +67,27 @@
       </div>
       <div class="card glass">
         <h2>Worker</h2>
+        <p id="automationPauseBanner" class="automation-pause hidden"></p>
         <p class="muted">Last poll: <span id="lastPoll">—</span></p>
         <p class="muted">Last Telegram id: <span id="lastMsgId">—</span></p>
+        <div class="worker-actions">
+          <button type="button" id="btnPauseAutomation" class="btn-neon-sm">Pause checks</button>
+          <button type="button" id="btnResumeAutomation" class="btn-neon-sm hidden">Resume now</button>
+        </div>
       </div>
     </section>
+
+    <div id="pauseModal" class="modal hidden" role="dialog" aria-labelledby="pauseModalTitle">
+      <div class="modal-panel glass">
+        <h2 id="pauseModalTitle">Pause background checks</h2>
+        <p class="muted">Stops Telegram, WhatsApp, connectivity, news refresh, and account polling until resume.</p>
+        <label class="modal-label">Auto-resume (your local time)<input id="pauseResumeAt" type="datetime-local" /></label>
+        <div class="modal-actions">
+          <button type="button" id="btnConfirmPause" class="btn-neon">Pause</button>
+          <button type="button" id="btnCancelPause" class="btn-neon btn-secondary">Cancel</button>
+        </div>
+      </div>
+    </div>
 
     <section class="panel glass panel-compact">
       <p class="muted">Dual platform: parallel opens when enabled. Capiffy <strong>open-only</strong> — configure lots &amp; news rules in <a href="/settings">Settings</a>.</p>
@@ -103,6 +120,21 @@
       <pre id="testTradeResult" class="test-result muted">—</pre>
     </section>
 
+    <section class="panel glass" id="pastTradesPanel">
+      <div class="row">
+        <h2>Past trades</h2>
+        <button type="button" id="btnRefreshPastTrades" class="btn-neon-sm">Refresh</button>
+      </div>
+      <p class="muted">Last <span id="pastTradesDays">30</span> days · MT5 comments <strong>ABD</strong> (Telegram) &amp; <strong>WASIG</strong> (WhatsApp)</p>
+      <div class="past-trades-summary">
+        <span>Total P/L: <strong id="pastTradesTotal" class="neon-text">—</strong></span>
+        <span>Win rate: <strong id="pastTradesWinRate">—</strong></span>
+        <span>Trades: <strong id="pastTradesCount">—</strong> (<span id="pastTradesWL">—</span>)</span>
+      </div>
+      <p id="pastTradesError" class="muted past-trades-error hidden"></p>
+      <div id="pastTradesList" class="past-trades-list"></div>
+    </section>
+
     <section class="panel glass">
       <div class="row">
         <h2>Signal history</h2>
@@ -120,6 +152,6 @@
   <div id="toast" class="toast hidden" role="status"></div>
   <script src="/static/auth.js?v=1"></script>
   <script src="/static/common.js?v=1"></script>
-  <script src="/static/app.js?v=10"></script>
+  <script src="/static/app.js?v=13"></script>
 </body>
 </html>

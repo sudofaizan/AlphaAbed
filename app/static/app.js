@@ -73,11 +73,15 @@ function renderSignals(signals) {
         ? `<div class="rr">R:R ${plan.reward_risk_ratio} · entry ${plan.entry} SL ${plan.sl} TP ${plan.tp} · risk ${plan.risk_points} pts</div>`
         : "";
       const foot = renderExecutionFoot(s.execution);
+      const note = s.history_note
+        ? `<p class="muted history-note">${escapeHtml(s.history_note)}</p>`
+        : "";
       const src = s.source === "whatsapp" ? "WA" : "TE";
       return `<article class="signal-item">
         <div><span class="signal-src">${src}</span> · <span class="kind">${s.kind}</span> · id ${escapeHtml(String(s.message_id))} · ${escapeHtml(s.date_ist || formatMessageDateIST(s.date))}</div>
         <div>${s.summary}</div>
         ${rr}
+        ${note}
         <pre>${escapeHtml(s.raw_text)}</pre>
         ${foot}
       </article>`;
@@ -154,8 +158,86 @@ async function loadStatus() {
   const waMid = document.getElementById("waLastMsgId");
   if (waMid) waMid.textContent = s.last_whatsapp_message_id || "—";
 
+  updateAutomationPauseUi(s);
   updateNewsBlackoutBanner(s);
 }
+
+function formatDatetimeLocalValue(d) {
+  const p = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(
+    d.getMinutes()
+  )}`;
+}
+
+function suggestedSunday2359Local() {
+  const now = new Date();
+  const target = new Date(now);
+  const dow = now.getDay();
+  let addDays = dow === 0 ? 0 : dow === 6 ? 1 : 7 - dow;
+  target.setDate(now.getDate() + addDays);
+  target.setHours(23, 59, 0, 0);
+  if (target <= now) {
+    target.setDate(target.getDate() + 7);
+  }
+  return target;
+}
+
+function updateAutomationPauseUi(s) {
+  const banner = document.getElementById("automationPauseBanner");
+  const btnPause = document.getElementById("btnPauseAutomation");
+  const btnResume = document.getElementById("btnResumeAutomation");
+  const paused = !!s.automation_paused;
+  if (banner) {
+    if (paused) {
+      banner.classList.remove("hidden");
+      banner.textContent = `Paused — auto-resume ${s.automation_resume_at_ist || s.automation_resume_at || "—"} (IST shown)`;
+    } else {
+      banner.classList.add("hidden");
+      banner.textContent = "";
+    }
+  }
+  if (btnPause) btnPause.classList.toggle("hidden", paused);
+  if (btnResume) btnResume.classList.toggle("hidden", !paused);
+}
+
+function openPauseModal() {
+  const input = document.getElementById("pauseResumeAt");
+  if (input) input.value = formatDatetimeLocalValue(suggestedSunday2359Local());
+  document.getElementById("pauseModal")?.classList.remove("hidden");
+}
+
+function closePauseModal() {
+  document.getElementById("pauseModal")?.classList.add("hidden");
+}
+
+document.getElementById("btnPauseAutomation")?.addEventListener("click", openPauseModal);
+document.getElementById("btnCancelPause")?.addEventListener("click", closePauseModal);
+document.getElementById("btnConfirmPause")?.addEventListener("click", async () => {
+  const raw = document.getElementById("pauseResumeAt")?.value;
+  if (!raw) {
+    alert("Pick auto-resume date and time.");
+    return;
+  }
+  const resumeAt = new Date(raw).toISOString();
+  const r = await api("/api/automation/pause", {
+    method: "POST",
+    body: JSON.stringify({ resume_at: resumeAt }),
+  });
+  if (r.ok === false) {
+    alert(r.error || "Could not pause");
+    return;
+  }
+  closePauseModal();
+  loadStatus();
+});
+document.getElementById("btnResumeAutomation")?.addEventListener("click", async () => {
+  const r = await api("/api/automation/resume", { method: "POST" });
+  if (r.ok === false) {
+    alert(r.error || "Could not resume");
+    return;
+  }
+  loadStatus();
+});
 
 function updateNewsBlackoutBanner(s) {
   const el = document.getElementById("newsBlackoutBanner");
@@ -290,13 +372,77 @@ document.getElementById("btnRefreshNews").addEventListener("click", async () => 
 
 document.getElementById("btnRefreshSignals").addEventListener("click", async () => {
   const r = await api("/api/signals/refresh", { method: "POST" });
+  if (r.skipped && r.reason === "automation paused") {
+    alert("Automation is paused — resume first or wait for auto-resume.");
+    return;
+  }
   if (!r.ok) {
-    alert("Refresh failed: " + (r.error || "unknown"));
+    alert("Refresh failed: " + (r.error || r.reason || "unknown"));
     return;
   }
   renderSignals(r.signals || []);
   alert(`Fetched ${r.fetched} messages → ${r.signal_count} signals`);
   loadStatus();
+});
+
+function renderPastTrades(data) {
+  const list = document.getElementById("pastTradesList");
+  const errEl = document.getElementById("pastTradesError");
+  if (!list) return;
+  const daysEl = document.getElementById("pastTradesDays");
+  if (daysEl) daysEl.textContent = data.days ?? 30;
+  const sum = data.summary || {};
+  document.getElementById("pastTradesTotal").textContent = fmtPnl(sum.total_profit);
+  document.getElementById("pastTradesWinRate").textContent =
+    sum.win_rate_pct != null ? `${sum.win_rate_pct}%` : "—";
+  document.getElementById("pastTradesCount").textContent = sum.total_trades ?? 0;
+  document.getElementById("pastTradesWL").textContent = `${sum.wins ?? 0}W / ${sum.losses ?? 0}L`;
+
+  if (data.errors && data.errors.length) {
+    errEl.classList.remove("hidden");
+    errEl.textContent = data.errors.join(" · ");
+  } else {
+    errEl.classList.add("hidden");
+    errEl.textContent = "";
+  }
+
+  const deals = data.deals || [];
+  if (!deals.length) {
+    list.innerHTML = "<p class='muted'>No ABD/WASIG closed deals in this window.</p>";
+    return;
+  }
+  const rows = deals
+    .map((d) => {
+      const pnl = Number(d.pnl ?? 0);
+      const cls = pnl > 0 ? "pnl-win" : pnl < 0 ? "pnl-loss" : "";
+      return `<tr>
+        <td>${escapeHtml(d.time_ist || d.time || "—")}</td>
+        <td>${escapeHtml(d.account_label || "—")}</td>
+        <td>${escapeHtml(d.comment || "—")}</td>
+        <td>${escapeHtml(String(d.type || "—"))}</td>
+        <td>${escapeHtml(String(d.volume ?? "—"))}</td>
+        <td class="${cls}">${fmtPnl(pnl)}</td>
+      </tr>`;
+    })
+    .join("");
+  list.innerHTML = `<table class="past-trades-table"><thead><tr>
+    <th>Time (IST)</th><th>Account</th><th>Tag</th><th>Side</th><th>Vol</th><th>P/L</th>
+  </tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+async function loadPastTrades() {
+  try {
+    const data = await api("/api/past-trades");
+    renderPastTrades(data);
+  } catch (e) {
+    const list = document.getElementById("pastTradesList");
+    if (list) list.innerHTML = "<p class='muted'>Could not load past trades.</p>";
+  }
+}
+
+document.getElementById("btnRefreshPastTrades")?.addEventListener("click", async () => {
+  const data = await api("/api/past-trades/refresh", { method: "POST" });
+  renderPastTrades(data);
 });
 
 async function pollUi() {
@@ -316,6 +462,7 @@ let dashboardStarted = false;
 function startDashboard() {
   if (dashboardStarted) return;
   dashboardStarted = true;
+  loadPastTrades();
   pollUi();
   setInterval(pollUi, 8000);
 }
