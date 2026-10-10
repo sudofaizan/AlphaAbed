@@ -7,8 +7,17 @@ from typing import Any
 
 from app.datetime_util import format_card_time_ist
 from app.mt5_accounts import list_enabled_mt5_accounts, mt5_client_for_account
+from app.test_trade import TEST_VOLUME_MT5
 
 SIGNAL_COMMENTS = frozenset({"ABD", "WASIG"})
+
+
+def _volume_is_test_lot(volume: Any) -> bool:
+    try:
+        v = float(volume)
+    except (TypeError, ValueError):
+        return False
+    return abs(v - TEST_VOLUME_MT5) < 1e-6
 
 
 def _deal_profit(deal: dict[str, Any]) -> float:
@@ -27,29 +36,75 @@ def _comment_matches(comment: str | None) -> bool:
         return False
     if c in SIGNAL_COMMENTS:
         return True
-    # MT5 may append suffixes; match prefix
     for tag in SIGNAL_COMMENTS:
         if c.startswith(tag):
             return True
     return False
 
 
+def _signal_tag_from_comment(comment: str | None) -> str:
+    c = (comment or "").strip()
+    if c.startswith("WASIG") or c == "WASIG":
+        return "WASIG"
+    if c.startswith("ABD") or c == "ABD":
+        return "ABD"
+    return c[:8] if c else "—"
+
+
+def _linked_signal_trades(deals: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """
+    MT5 often clears or replaces comment on OUT deals ([sl …], [tp …], empty).
+    Link OUT closes to positions opened with IN deals tagged ABD / WASIG.
+    """
+    open_meta: dict[Any, dict[str, Any]] = {}
+    for d in deals:
+        if (d.get("entry") or "").lower() != "in":
+            continue
+        if not _comment_matches(d.get("comment")):
+            continue
+        if _volume_is_test_lot(d.get("volume")):
+            continue
+        pid = d.get("position_id")
+        if pid is None:
+            continue
+        open_meta[pid] = {
+            "comment": _signal_tag_from_comment(d.get("comment")),
+            "open_time": d.get("time"),
+            "open_type": d.get("type"),
+            "volume": d.get("volume"),
+            "symbol": d.get("symbol"),
+        }
+
+    closed: list[dict[str, Any]] = []
+    for d in deals:
+        if (d.get("entry") or "").lower() != "out":
+            continue
+        pid = d.get("position_id")
+        meta = open_meta.get(pid)
+        if not meta:
+            continue
+        closed.append({**d, "_signal_meta": meta, "_signal_comment": meta["comment"]})
+    return closed
+
+
 def _normalize_deal(deal: dict[str, Any], account: dict[str, Any]) -> dict[str, Any]:
     pnl = _deal_profit(deal)
+    meta = deal.get("_signal_meta") or {}
+    tag = deal.get("_signal_comment") or _signal_tag_from_comment(deal.get("comment"))
     t = deal.get("time") or deal.get("time_msc")
     return {
         "ticket": deal.get("ticket"),
         "position_id": deal.get("position_id"),
         "time": t,
         "time_ist": format_card_time_ist(t),
-        "symbol": deal.get("symbol"),
-        "type": deal.get("type"),
-        "volume": deal.get("volume"),
+        "symbol": deal.get("symbol") or meta.get("symbol"),
+        "type": deal.get("type") or meta.get("open_type"),
+        "volume": deal.get("volume") or meta.get("volume"),
         "price": deal.get("price"),
         "profit": deal.get("profit"),
         "net": deal.get("net", pnl),
         "pnl": pnl,
-        "comment": (deal.get("comment") or "").strip(),
+        "comment": tag,
         "account_id": account.get("id"),
         "account_label": account.get("label") or account.get("id"),
         "win": pnl > 0,
@@ -60,7 +115,7 @@ def _normalize_deal(deal: dict[str, Any], account: dict[str, Any]) -> dict[str, 
 def fetch_account_history(account: dict[str, Any], *, days: int = 30) -> dict[str, Any]:
     client = mt5_client_for_account(account)
     client.cfg.timeout = max(int(client.cfg.timeout), 45)
-    resp = client.get_history(days=days, closed_only=True, limit=10000)
+    resp = client.get_history(days=days, closed_only=False, limit=10000)
     if not resp.get("ok"):
         return {
             "ok": False,
@@ -68,11 +123,9 @@ def fetch_account_history(account: dict[str, Any], *, days: int = 30) -> dict[st
             "label": account.get("label"),
             "error": resp.get("error") or "getHistory failed",
         }
-    deals = [
-        _normalize_deal(d, account)
-        for d in (resp.get("deals") or [])
-        if _comment_matches(d.get("comment"))
-    ]
+    raw = resp.get("deals") or []
+    linked = _linked_signal_trades(raw)
+    deals = [_normalize_deal(d, account) for d in linked]
     return {
         "ok": True,
         "account_id": account.get("id"),
@@ -137,4 +190,9 @@ def fetch_past_trades(cfg: dict, *, days: int = 30) -> dict[str, Any]:
         "summary": summary,
         "accounts": results,
         "errors": errors,
+        "note": (
+            "Closed legs linked to opens with comment ABD/WASIG; "
+            f"excludes {TEST_VOLUME_MT5} lot test opens; "
+            "OUT rows often have empty or [sl]/[tp] comments."
+        ),
     }
