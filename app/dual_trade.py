@@ -60,14 +60,21 @@ def should_trade_capiffy(cfg: dict) -> bool:
     return bool(cfg.get("capiffy_enabled")) and bool(cfg.get("trade_capiffy"))
 
 
+def _order_comment(cfg: dict, override: str | None = None) -> str:
+    if override:
+        return override.strip()[:31]
+    return (cfg.get("mt5_trade_comment") or "ABD").strip()[:31]
+
+
 def open_market_parallel(
     cfg: dict,
     plan: TradePlan,
     *,
     mt5_volume: Optional[float] = None,
     capiffy_volume: Optional[float] = None,
+    mt5_comment: str | None = None,
 ) -> dict[str, Any]:
-    comment = (cfg.get("mt5_trade_comment") or "ABD").strip()[:31]
+    comment = _order_comment(cfg, mt5_comment)
     mt5_vol = float(mt5_volume if mt5_volume is not None else cfg["volume"])
     cap_vol = float(
         capiffy_volume if capiffy_volume is not None else cfg.get("capiffy_volume") or mt5_vol

@@ -106,7 +106,17 @@ def _process_signal_row_sync(row: dict[str, Any], cfg: dict) -> dict[str, Any] |
     except ValueError as exc:
         return {"action": "skipped", "reason": str(exc)}
 
-    result = open_market_parallel(cfg, plan, mt5_volume=mt5_vol, capiffy_volume=cap_vol)
+    if source == "whatsapp":
+        mt5_comment = (cfg.get("whatsapp_trade_comment") or "WASIG").strip()[:31]
+    else:
+        mt5_comment = (cfg.get("mt5_trade_comment") or "ABD").strip()[:31]
+    result = open_market_parallel(
+        cfg,
+        plan,
+        mt5_volume=mt5_vol,
+        capiffy_volume=cap_vol,
+        mt5_comment=mt5_comment,
+    )
 
     return {
         "action": "open",

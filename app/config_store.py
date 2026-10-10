@@ -23,6 +23,7 @@ DEFAULTS = {
     "mt5_api_key": "alphafx",
     "mt5_symbol": "XAUUSD.pr",
     "mt5_trade_comment": "ABD",
+    "whatsapp_trade_comment": "WASIG",
     "volume": 0.1,
     "lot_mode": "fixed",
     "risk_usd": 30.0,

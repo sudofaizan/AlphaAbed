@@ -36,6 +36,7 @@ def _msg_record(message, body: str) -> dict[str, Any]:
     parsed = classify_text(body)
     return {
         "message_id": message.id,
+        "source": "telegram",
         "date": when,
         "date_ist": format_message_time_ist(when_dt),
         "kind": parsed.kind,

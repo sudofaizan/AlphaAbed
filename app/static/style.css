@@ -268,6 +268,15 @@ input:focus {
   backdrop-filter: blur(8px);
 }
 
+.signal-item .signal-src {
+  font-family: "Orbitron", sans-serif;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  color: var(--neon);
+  border: 1px solid var(--glass-border);
+  padding: 0.1rem 0.35rem;
+  border-radius: 3px;
+}
 .signal-item .kind {
   font-weight: 700;
   color: var(--neon);

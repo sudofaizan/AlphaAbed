@@ -54,6 +54,7 @@ class ConfigUpdate(BaseModel):
     mt5_api_key: Optional[str] = None
     mt5_symbol: Optional[str] = None
     mt5_trade_comment: Optional[str] = None
+    whatsapp_trade_comment: Optional[str] = None
     volume: Optional[float] = None
     lot_mode: Optional[str] = None
     risk_usd: Optional[float] = None
