@@ -11,28 +11,45 @@ from app.lot_sizing import compute_trade_volumes
 from app.mt5_accounts import primary_mt5_client
 from signals.classify import TradeSignal, classify_text, merge_sl_fragment
 from signals.trade_plan import build_trade_plan
+from signals.whatsapp_classify import classify_whatsapp_text
 
 log = logging.getLogger("alphaabed.trading")
 
 _pending: TradeSignal | None = None
 
 
+def _classify_row(row: dict[str, Any]):
+    source = (row.get("source") or "telegram").lower()
+    text = row.get("raw_text", "")
+    if source == "whatsapp":
+        return classify_whatsapp_text(text)
+    return classify_text(text)
+
+
 def _process_signal_row_sync(row: dict[str, Any], cfg: dict) -> dict[str, Any] | None:
     global _pending
-    parsed = classify_text(row.get("raw_text", ""))
+    source = (row.get("source") or "telegram").lower()
+
+    if source == "telegram" and not cfg.get("telegram_enabled", True):
+        return {"action": "skipped", "reason": "telegram signals disabled", "kind": "—"}
+    if source == "whatsapp" and not cfg.get("whatsapp_enabled", False):
+        return {"action": "skipped", "reason": "whatsapp signals disabled", "kind": "—"}
+
+    parsed = _classify_row(row)
     kind = parsed.kind
 
-    if kind == "sl_fragment" and parsed.signal and _pending:
-        merged = merge_sl_fragment(_pending, row.get("raw_text", ""))
-        if merged:
-            _pending = None
-            parsed.kind = "open_signal"
-            parsed.signal = merged
-            kind = "open_signal"
+    if source == "telegram":
+        if kind == "sl_fragment" and parsed.signal and _pending:
+            merged = merge_sl_fragment(_pending, row.get("raw_text", ""))
+            if merged:
+                _pending = None
+                parsed.kind = "open_signal"
+                parsed.signal = merged
+                kind = "open_signal"
 
-    if kind == "incomplete_signal" and parsed.signal and parsed.signal.sl is None:
-        _pending = parsed.signal
-        return None
+        if kind == "incomplete_signal" and parsed.signal and parsed.signal.sl is None:
+            _pending = parsed.signal
+            return None
 
     if kind not in ("open_signal", "close_all", "partial_close"):
         return None
@@ -67,12 +84,15 @@ def _process_signal_row_sync(row: dict[str, Any], cfg: dict) -> dict[str, Any] |
     ask = float(price["ask"])
     point = float(price.get("point") or 0.01)
     default_sl = float(cfg["default_sl_points"]) if signal.sl is None else None
+    prefer_tp = bool(cfg.get("prefer_signal_tp")) or (
+        source == "whatsapp" and signal.tp is not None
+    )
     plan = build_trade_plan(
         signal,
         bid=bid,
         ask=ask,
         reward_risk_ratio=float(cfg["reward_risk_ratio"]),
-        prefer_signal_tp=bool(cfg["prefer_signal_tp"]),
+        prefer_signal_tp=prefer_tp,
         default_sl_points=default_sl,
         point=point,
     )
@@ -94,6 +114,7 @@ def _process_signal_row_sync(row: dict[str, Any], cfg: dict) -> dict[str, Any] |
         "sizing": sizing_meta,
         "result": result,
         "message_id": row.get("message_id"),
+        "source": source,
     }
 
 

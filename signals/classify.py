@@ -27,6 +27,7 @@ class TradeSignal:
     entry_max: float | None = None
     sl: float | None = None
     tp: float | None = None
+    tp_levels: list[float] | None = None
     market: bool = False
 
 

@@ -28,8 +28,10 @@ from app.connectivity import (
     record_capiffy,
     record_mt5,
     record_telegram,
+    record_whatsapp,
     run_connectivity_checks,
 )
+from app.whatsapp_service import test_whatsapp_feed
 from app.datetime_util import format_card_time_ist
 from app.news_blackout import blackout_status
 from app.news_service import get_news_snapshot, refresh_news_sync
@@ -78,6 +80,10 @@ class ConfigUpdate(BaseModel):
     capiffy_news_blackout: Optional[bool] = None
     capiffy_news_minutes_before: Optional[int] = None
     capiffy_news_minutes_after: Optional[int] = None
+    telegram_enabled: Optional[bool] = None
+    whatsapp_enabled: Optional[bool] = None
+    whatsapp_messages_url: Optional[str] = None
+    whatsapp_poll_sec: Optional[int] = None
 
 
 class PreviewBody(BaseModel):
@@ -178,12 +184,19 @@ async def api_status():
         tg_at = state.last_telegram_ok_at
         mt5_at = state.last_mt5_ok_at
         cap_at = state.last_capiffy_ok_at
+        wa_at = state.last_whatsapp_ok_at
         poll_at = state.last_poll_at
+        tg_ok = state.last_telegram_ok if cfg.get("telegram_enabled", True) else None
+        wa_ok = (
+            state.last_whatsapp_ok
+            if cfg.get("whatsapp_enabled") and (cfg.get("whatsapp_messages_url") or "").strip()
+            else None
+        )
         return {
             "worker_running": state.worker_running,
             "last_poll_at": poll_at,
             "last_poll_at_ist": format_card_time_ist(poll_at),
-            "last_telegram_ok": state.last_telegram_ok,
+            "last_telegram_ok": tg_ok,
             "last_telegram_error": state.last_telegram_error,
             "last_telegram_ok_at": tg_at,
             "last_telegram_ok_at_ist": format_card_time_ist(tg_at),
@@ -195,6 +208,11 @@ async def api_status():
             "last_capiffy_error": state.last_capiffy_error,
             "last_capiffy_ok_at": cap_at,
             "last_capiffy_ok_at_ist": format_card_time_ist(cap_at),
+            "last_whatsapp_ok": wa_ok,
+            "last_whatsapp_error": state.last_whatsapp_error,
+            "last_whatsapp_ok_at": wa_at,
+            "last_whatsapp_ok_at_ist": format_card_time_ist(wa_at),
+            "last_whatsapp_message_id": state.last_whatsapp_message_id,
             "health_check_interval_sec": 60,
             "today_pnl": state.today_pnl,
             "account_equity": state.account_equity,
@@ -244,6 +262,15 @@ async def put_config(body: ConfigUpdate):
 async def api_test_telegram():
     result = await test_telegram()
     record_telegram(bool(result.get("ok")), result.get("error"))
+    return result
+
+
+@app.post("/api/test/whatsapp")
+async def api_test_whatsapp():
+    cfg = load_config()
+    result = await run_blocking(test_whatsapp_feed, cfg)
+    if cfg.get("whatsapp_enabled"):
+        record_whatsapp(bool(result.get("ok")), result.get("error"), result.get("channel"))
     return result
 
 

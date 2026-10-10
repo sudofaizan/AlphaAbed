@@ -73,8 +73,9 @@ function renderSignals(signals) {
         ? `<div class="rr">R:R ${plan.reward_risk_ratio} · entry ${plan.entry} SL ${plan.sl} TP ${plan.tp} · risk ${plan.risk_points} pts</div>`
         : "";
       const foot = renderExecutionFoot(s.execution);
+      const src = s.source === "whatsapp" ? "WA" : "TG";
       return `<article class="signal-item">
-        <div><span class="kind">${s.kind}</span> · id ${s.message_id} · ${escapeHtml(s.date_ist || formatMessageDateIST(s.date))}</div>
+        <div><span class="kind">${s.kind}</span> · ${src} · id ${escapeHtml(String(s.message_id))} · ${escapeHtml(s.date_ist || formatMessageDateIST(s.date))}</div>
         <div>${s.summary}</div>
         ${rr}
         <pre>${escapeHtml(s.raw_text)}</pre>
@@ -112,13 +113,14 @@ async function loadStatus() {
     s.last_poll_at_ist || formatMessageDateIST(s.last_poll_at);
   document.getElementById("lastMsgId").textContent = s.last_message_id ?? "—";
 
+  const tgOn = s.config && s.config.telegram_enabled !== false;
   setStatusCard(
     "tgStatus",
     "tgLastOk",
-    s.last_telegram_ok,
-    null,
+    tgOn ? s.last_telegram_ok : null,
+    "Off",
     s.last_telegram_error || "Check",
-    s.last_telegram_ok_at_ist
+    tgOn ? s.last_telegram_ok_at_ist : null
   );
   setStatusCard(
     "mt5Status",
@@ -137,6 +139,20 @@ async function loadStatus() {
     s.last_capiffy_error || "Check",
     capEnabled ? s.last_capiffy_ok_at_ist : null
   );
+  const waOn =
+    s.config &&
+    s.config.whatsapp_enabled &&
+    (s.config.whatsapp_messages_url || "").trim();
+  setStatusCard(
+    "waStatus",
+    "waLastOk",
+    waOn ? s.last_whatsapp_ok : null,
+    "Off",
+    s.last_whatsapp_error || "Check",
+    waOn ? s.last_whatsapp_ok_at_ist : null
+  );
+  const waMid = document.getElementById("waLastMsgId");
+  if (waMid) waMid.textContent = s.last_whatsapp_message_id || "—";
 
   updateNewsBlackoutBanner(s);
 }
@@ -197,6 +213,16 @@ async function loadNews() {
 document.getElementById("btnTestTg").addEventListener("click", async () => {
   const r = await api("/api/test/telegram", { method: "POST" });
   alert(r.ok ? `OK: ${r.title}\nLatest id: ${r.latest_message_id}\n${r.preview}` : `Failed: ${r.error}`);
+  loadStatus();
+});
+
+document.getElementById("btnTestWa")?.addEventListener("click", async () => {
+  const r = await api("/api/test/whatsapp", { method: "POST" });
+  alert(
+    r.ok
+      ? `OK: ${r.channel}\nMessages: ${r.count}\nLatest id: ${r.latest_message_id}\n${r.preview}`
+      : `Failed: ${r.error}`
+  );
   loadStatus();
 });
 

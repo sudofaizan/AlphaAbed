@@ -72,6 +72,7 @@ body::after {
 .mt5-account-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; grid-column: 1 / -1; }
 .btn-secondary { background: transparent; border: 1px solid var(--neon-soft); color: var(--neon-soft); }
 .lot-hint { grid-column: 1 / -1; margin: 0; font-size: 0.9rem; }
+.settings-sub { grid-column: 1 / -1; margin: 0.75rem 0 0; font-family: Orbitron, sans-serif; font-size: 0.95rem; color: var(--neon-soft); }
 
 .top-bar {
   display: flex;

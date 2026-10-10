@@ -20,6 +20,10 @@ class RuntimeState:
     last_capiffy_ok: bool | None = None
     last_capiffy_error: str | None = None
     last_capiffy_ok_at: str | None = None
+    last_whatsapp_ok: bool | None = None
+    last_whatsapp_error: str | None = None
+    last_whatsapp_ok_at: str | None = None
+    last_whatsapp_message_id: str | None = None
     today_pnl: float | None = None
     account_equity: float | None = None
     signal_history: list[dict[str, Any]] = field(default_factory=list)

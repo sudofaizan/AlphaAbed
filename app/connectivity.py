@@ -13,6 +13,7 @@ from app.mt5_accounts import list_enabled_mt5_accounts
 from app.news_service import maybe_refresh_news
 from app.state import state
 from app.telegram_service import test_telegram
+from app.whatsapp_service import test_whatsapp_feed
 
 log = logging.getLogger("alphaabed.connectivity")
 
@@ -23,13 +24,13 @@ def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def record_telegram(ok: bool, error: str | None = None) -> None:
+def record_telegram(ok: bool | None, error: str | None = None) -> None:
     with state.lock:
         state.last_telegram_ok = ok
-        if ok:
+        if ok is True:
             state.last_telegram_ok_at = _utc_now_iso()
             state.last_telegram_error = None
-        elif error is not None:
+        elif ok is False and error is not None:
             state.last_telegram_error = error
 
 
@@ -45,6 +46,16 @@ def record_mt5(ok: bool, error: str | None = None, account: dict | None = None) 
                 state.account_equity = account.get("equity")
         elif error is not None:
             state.last_mt5_error = error
+
+
+def record_whatsapp(ok: bool | None, error: str | None = None, channel: str | None = None) -> None:
+    with state.lock:
+        state.last_whatsapp_ok = ok
+        if ok is True:
+            state.last_whatsapp_ok_at = _utc_now_iso()
+            state.last_whatsapp_error = None
+        elif ok is False and error is not None:
+            state.last_whatsapp_error = error
 
 
 def record_capiffy(ok: bool | None, error: str | None = None) -> None:
@@ -83,8 +94,17 @@ async def check_mt5(cfg: dict) -> dict:
 async def run_connectivity_checks(cfg: dict | None = None) -> None:
     cfg = cfg or load_config()
 
-    tg = await test_telegram()
-    record_telegram(bool(tg.get("ok")), tg.get("error"))
+    if cfg.get("telegram_enabled", True):
+        tg = await test_telegram()
+        record_telegram(bool(tg.get("ok")), tg.get("error"))
+    else:
+        record_telegram(None, None)
+
+    if cfg.get("whatsapp_enabled") and (cfg.get("whatsapp_messages_url") or "").strip():
+        wa = await run_blocking(test_whatsapp_feed, cfg)
+        record_whatsapp(bool(wa.get("ok")), wa.get("error"))
+    else:
+        record_whatsapp(None, None)
 
     await check_mt5(cfg)
 

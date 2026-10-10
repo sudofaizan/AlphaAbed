@@ -13,7 +13,11 @@ from app.mt5_accounts import normalize_mt5_accounts
 
 DEFAULTS = {
     "poll_interval_sec": 1,
+    "telegram_enabled": True,
     "telegram_realtime": True,
+    "whatsapp_enabled": False,
+    "whatsapp_messages_url": "",
+    "whatsapp_poll_sec": 1,
     "account_refresh_sec": 15,
     "mt5_base_url": "http://15.135.71.95:8080",
     "mt5_api_key": "alphafx",

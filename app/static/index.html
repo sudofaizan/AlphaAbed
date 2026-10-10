@@ -47,6 +47,13 @@
         <button type="button" id="btnTestTg" class="btn-neon-sm">Test fetch</button>
       </div>
       <div class="card glass status-card">
+        <h2>WhatsApp</h2>
+        <p id="waStatus" class="badge">—</p>
+        <p class="muted card-last-ok">Last OK: <span id="waLastOk">—</span></p>
+        <p class="muted">Last signal id: <span id="waLastMsgId">—</span></p>
+        <button type="button" id="btnTestWa" class="btn-neon-sm">Test feed</button>
+      </div>
+      <div class="card glass status-card">
         <h2>MT5 API</h2>
         <p id="mt5Status" class="badge">—</p>
         <p class="muted card-last-ok">Last OK: <span id="mt5LastOk">—</span></p>
@@ -61,7 +68,7 @@
       <div class="card glass">
         <h2>Worker</h2>
         <p class="muted">Last poll: <span id="lastPoll">—</span></p>
-        <p class="muted">Last msg id: <span id="lastMsgId">—</span></p>
+        <p class="muted">Last Telegram id: <span id="lastMsgId">—</span></p>
       </div>
     </section>
 
@@ -113,6 +120,6 @@
   <div id="toast" class="toast hidden" role="status"></div>
   <script src="/static/auth.js?v=1"></script>
   <script src="/static/common.js?v=1"></script>
-  <script src="/static/app.js?v=8"></script>
+  <script src="/static/app.js?v=9"></script>
 </body>
 </html>

@@ -40,7 +40,7 @@ function renderMt5Account(acc) {
     <label>Base URL<input data-field="base_url" type="text" value="${escapeHtml(acc.base_url || "")}" placeholder="http://host:8080" /></label>
     <label>API key<input data-field="api_key" type="text" value="${escapeHtml(acc.api_key || "")}" /></label>
     <label>Symbol<input data-field="symbol" type="text" value="${escapeHtml(acc.symbol || "XAUUSD.pr")}" /></label>
-    <label class="check"><input data-field="enabled" type="checkbox" ${acc.enabled !== false ? "checked" : ""} /> Enabled</label>
+    <label class="check"><input data-field="enabled" type="checkbox" ${acc.enabled !== false ? "checked" : ""} /> Trade signals on this account</label>
     <div class="mt5-account-actions">
       <button type="button" class="btn-neon btn-secondary btn-test-mt5">Test connection</button>
       <button type="button" class="btn-neon btn-secondary btn-remove-mt5">Remove</button>
@@ -95,9 +95,12 @@ function renderCurrentSettings(cfg) {
     ["MT5 accounts (enabled)", acctCount],
     ["Lot sizing", lotLine],
     ["Capiffy lot (fixed mode)", cfg.capiffy_volume ?? "—"],
-    ["Auto-trade MT5", yn(cfg.trade_mt5 !== false)],
-    ["Capiffy enabled", yn(cfg.capiffy_enabled)],
-    ["Auto-trade Capiffy", yn(cfg.trade_capiffy)],
+    ["Follow Telegram", yn(cfg.telegram_enabled !== false)],
+    ["Follow WhatsApp", yn(cfg.whatsapp_enabled)],
+    ["WhatsApp URL", cfg.whatsapp_messages_url || "—"],
+    ["Execute MT5", yn(cfg.trade_mt5 !== false)],
+    ["Capiffy API", yn(cfg.capiffy_enabled)],
+    ["Execute Capiffy", yn(cfg.trade_capiffy)],
     ["Capiffy symbol", cfg.capiffy_symbol ?? "—"],
     ["Capiffy account id", cfg.capiffy_account_id || "(from .env)"],
     ["News calendar", yn(cfg.news_calendar_enabled !== false)],
