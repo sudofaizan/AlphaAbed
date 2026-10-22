@@ -64,6 +64,7 @@ class ConfigUpdate(BaseModel):
     reward_risk_ratio: Optional[float] = None
     prefer_signal_tp: Optional[bool] = None
     auto_trade: Optional[bool] = None
+    trade_cooldown_sec: Optional[int] = None
     allow_trade_without_sl: Optional[bool] = None
     default_sl_points: Optional[float] = None
     telegram_fetch_limit: Optional[int] = None

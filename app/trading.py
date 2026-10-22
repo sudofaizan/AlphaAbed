@@ -9,6 +9,7 @@ from app.async_io import run_blocking
 from app.dual_trade import close_all_parallel, open_market_parallel, partial_close_all_mt5
 from app.lot_sizing import compute_trade_volumes
 from app.mt5_accounts import primary_mt5_client
+from app.trade_dedupe import check_trade_cooldown, mark_trade_executed, reserve_trade_execution
 from signals.classify import TradeSignal, classify_text, merge_sl_fragment
 from signals.trade_plan import build_trade_plan
 from signals.whatsapp_classify import classify_whatsapp_text
@@ -57,12 +58,37 @@ def _process_signal_row_sync(row: dict[str, Any], cfg: dict) -> dict[str, Any] |
     if not cfg.get("auto_trade"):
         return {"action": "skipped", "reason": "auto_trade disabled", "kind": kind}
 
+    cooldown_sec = int(cfg.get("trade_cooldown_sec") or 300)
+    ok_cd, cd_reason = check_trade_cooldown(cooldown_sec)
+    if not ok_cd:
+        log.info("Skip cooldown %s %s: %s", source, row.get("message_id"), cd_reason)
+        return {
+            "action": "skipped",
+            "reason": cd_reason,
+            "kind": kind,
+            "message_id": row.get("message_id"),
+            "source": source,
+        }
+
+    ok_reserve, dup_reason = reserve_trade_execution(source, row.get("message_id"))
+    if not ok_reserve:
+        log.info("Skip duplicate trade %s %s", source, row.get("message_id"))
+        return {
+            "action": "skipped",
+            "reason": dup_reason,
+            "kind": kind,
+            "message_id": row.get("message_id"),
+            "source": source,
+        }
+
     client = primary_mt5_client(cfg)
 
     if kind == "close_all":
+        mark_trade_executed()
         return {"action": "close_all", "result": close_all_parallel(cfg)}
 
     if kind == "partial_close":
+        mark_trade_executed()
         vol = float(cfg["volume"]) / 2
         return {
             "action": "partial_close",
@@ -110,6 +136,7 @@ def _process_signal_row_sync(row: dict[str, Any], cfg: dict) -> dict[str, Any] |
         mt5_comment = (cfg.get("whatsapp_trade_comment") or "WASIG").strip()[:31]
     else:
         mt5_comment = (cfg.get("mt5_trade_comment") or "ABD").strip()[:31]
+    mark_trade_executed()
     result = open_market_parallel(
         cfg,
         plan,

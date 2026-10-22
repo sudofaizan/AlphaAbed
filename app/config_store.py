@@ -34,6 +34,7 @@ DEFAULTS = {
     "reward_risk_ratio": 2.0,
     "prefer_signal_tp": False,
     "auto_trade": False,
+    "trade_cooldown_sec": 300,
     "allow_trade_without_sl": False,
     "default_sl_points": 500,
     "telegram_fetch_limit": 100,

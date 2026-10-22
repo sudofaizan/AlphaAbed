@@ -93,6 +93,8 @@
         <label class="check"><input name="prefer_signal_tp" type="checkbox" /> Use TP from message</label>
         <label class="check"><input name="allow_trade_without_sl" type="checkbox" /> Trade without SL (default points)</label>
         <label class="check warn"><input name="auto_trade" type="checkbox" /> Auto-trade live orders</label>
+        <label>Min seconds between auto-trades (0 = off)<input name="trade_cooldown_sec" type="number" min="0" max="86400" step="1" /></label>
+        <p class="muted lot-hint">Default 300 (5 min): any open / close / partial signal inside the window is ignored.</p>
         <div class="actions">
           <button type="submit" class="btn-neon">Save settings</button>
         </div>
@@ -103,6 +105,6 @@
   <div id="toast" class="toast hidden" role="status"></div>
   <script src="/static/auth.js?v=1"></script>
   <script src="/static/common.js?v=1"></script>
-  <script src="/static/settings.js?v=3"></script>
+  <script src="/static/settings.js?v=4"></script>
 </body>
 </html>

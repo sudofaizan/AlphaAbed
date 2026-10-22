@@ -92,6 +92,7 @@ function renderCurrentSettings(cfg) {
     ["Poll interval (sec)", cfg.poll_interval_sec ?? "—"],
     ["Account refresh (sec)", cfg.account_refresh_sec ?? "—"],
     ["Auto-trade", yn(cfg.auto_trade)],
+    ["Trade cooldown (sec)", cfg.trade_cooldown_sec ?? 300],
     ["MT5 accounts (enabled)", acctCount],
     ["Lot sizing", lotLine],
     ["Capiffy lot (fixed mode)", cfg.capiffy_volume ?? "—"],
