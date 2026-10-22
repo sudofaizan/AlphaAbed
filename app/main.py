@@ -38,6 +38,7 @@ from app.news_service import get_news_snapshot, refresh_news_sync
 from app.ui_auth import create_session, revoke_session, verify_password, verify_session
 from app.automation_pause import pause_automation, pause_status, resume_automation_now
 from app.past_trades import fetch_past_trades
+from app.trade_dedupe import trade_cooldown_status
 from app.worker import refresh_history_once, worker_loop
 from signals.trade_plan import build_trade_plan
 
@@ -227,6 +228,7 @@ async def api_status():
             "account_equity": state.account_equity,
             "last_message_id": state.last_message_id,
             "config": cfg,
+            "trade_cooldown": trade_cooldown_status(int(cfg.get("trade_cooldown_sec") or 0)),
             **news_blk,
             **pause,
         }

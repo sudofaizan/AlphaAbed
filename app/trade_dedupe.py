@@ -92,6 +92,55 @@ def mark_trade_executed() -> None:
         _save_store_unlocked(store["keys"], now)
 
 
+def trade_cooldown_status(cooldown_sec: int) -> dict:
+    """Snapshot for dashboard: remaining time until next auto-trade allowed."""
+    sec = int(cooldown_sec or 0)
+    if sec <= 0:
+        return {
+            "enabled": False,
+            "cooldown_sec": 0,
+            "active": False,
+            "remaining_sec": 0,
+            "ready_at": None,
+            "last_trade_at": None,
+        }
+    now = datetime.now(timezone.utc)
+    with _lock:
+        store = _load_store_unlocked()
+        last_iso = store.get("last_trade_at")
+        last = _parse_utc(last_iso or "")
+    if not last:
+        return {
+            "enabled": True,
+            "cooldown_sec": sec,
+            "active": False,
+            "remaining_sec": 0,
+            "ready_at": None,
+            "last_trade_at": None,
+        }
+    elapsed = (now - last).total_seconds()
+    if elapsed >= sec:
+        return {
+            "enabled": True,
+            "cooldown_sec": sec,
+            "active": False,
+            "remaining_sec": 0,
+            "ready_at": None,
+            "last_trade_at": last_iso,
+        }
+    remaining = max(0.0, sec - elapsed)
+    ready = last.timestamp() + sec
+    ready_dt = datetime.fromtimestamp(ready, tz=timezone.utc)
+    return {
+        "enabled": True,
+        "cooldown_sec": sec,
+        "active": True,
+        "remaining_sec": max(0, int(remaining + 0.999)),
+        "ready_at": ready_dt.isoformat(),
+        "last_trade_at": last_iso,
+    }
+
+
 def reserve_trade_execution(source: str, message_id: object) -> tuple[bool, str]:
     """
     Atomically claim this message for execution.

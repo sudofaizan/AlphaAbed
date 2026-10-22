@@ -509,3 +509,6 @@ code {
 .past-trades-table .pnl-win { color: var(--ok); }
 .past-trades-table .pnl-loss { color: var(--bad); }
 .past-trades-error { color: var(--bad); }
+
+.cooldown-text.cooldown-active { color: var(--warn, #e6a817); font-weight: 600; }
+.cooldown-text.cooldown-ready { color: var(--ok); }

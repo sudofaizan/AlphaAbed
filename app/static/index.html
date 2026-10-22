@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Rajdhani:wght@400;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/style.css?v=7" />
+  <link rel="stylesheet" href="/static/style.css?v=8" />
 </head>
 <body>
   <div id="loginGate" class="login-gate">
@@ -70,6 +70,7 @@
         <p id="automationPauseBanner" class="automation-pause hidden"></p>
         <p class="muted">Last poll: <span id="lastPoll">—</span></p>
         <p class="muted">Last Telegram id: <span id="lastMsgId">—</span></p>
+        <p class="muted">Trade cooldown: <span id="tradeCooldown" class="cooldown-text">—</span></p>
         <div class="worker-actions">
           <button type="button" id="btnPauseAutomation" class="btn-neon-sm">Pause checks</button>
           <button type="button" id="btnResumeAutomation" class="btn-neon-sm hidden">Resume now</button>
@@ -152,6 +153,6 @@
   <div id="toast" class="toast hidden" role="status"></div>
   <script src="/static/auth.js?v=1"></script>
   <script src="/static/common.js?v=1"></script>
-  <script src="/static/app.js?v=13"></script>
+  <script src="/static/app.js?v=14"></script>
 </body>
 </html>

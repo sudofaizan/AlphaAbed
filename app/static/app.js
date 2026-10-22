@@ -109,6 +109,50 @@ function setStatusCard(badgeId, lastOkId, ok, offLabel, errorText, lastOkIst) {
   }
 }
 
+let tradeCooldownTick = null;
+
+function formatCooldownClock(totalSec) {
+  const s = Math.max(0, Math.ceil(totalSec));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return m > 0 ? `${m}:${String(r).padStart(2, "0")}` : `${s}s`;
+}
+
+function applyTradeCooldown(cd, autoTrade) {
+  const el = document.getElementById("tradeCooldown");
+  if (!el) return;
+  if (!autoTrade) {
+    el.textContent = "Auto-trade off";
+    el.className = "cooldown-text muted";
+    tradeCooldownTick = null;
+    return;
+  }
+  if (!cd || !cd.enabled) {
+    el.textContent = "Off (0 sec in Settings)";
+    el.className = "cooldown-text muted";
+    tradeCooldownTick = null;
+    return;
+  }
+  tradeCooldownTick = {
+    cooldownSec: cd.cooldown_sec,
+    readyAtMs: cd.active && cd.ready_at ? new Date(cd.ready_at).getTime() : Date.now(),
+  };
+  renderTradeCooldown();
+}
+
+function renderTradeCooldown() {
+  const el = document.getElementById("tradeCooldown");
+  if (!el || !tradeCooldownTick) return;
+  const remSec = (tradeCooldownTick.readyAtMs - Date.now()) / 1000;
+  if (remSec <= 0) {
+    el.textContent = `Ready (${tradeCooldownTick.cooldownSec}s window)`;
+    el.className = "cooldown-text cooldown-ready";
+    return;
+  }
+  el.textContent = `${formatCooldownClock(remSec)} left — signals ignored`;
+  el.className = "cooldown-text cooldown-active";
+}
+
 async function loadStatus() {
   const s = await api("/api/status");
   document.getElementById("todayPnl").textContent = fmtPnl(s.today_pnl);
@@ -160,6 +204,7 @@ async function loadStatus() {
 
   updateAutomationPauseUi(s);
   updateNewsBlackoutBanner(s);
+  applyTradeCooldown(s.trade_cooldown, !!(s.config && s.config.auto_trade));
 }
 
 function formatDatetimeLocalValue(d) {
@@ -465,6 +510,7 @@ function startDashboard() {
   loadPastTrades();
   pollUi();
   setInterval(pollUi, 8000);
+  setInterval(renderTradeCooldown, 1000);
 }
 
 window.addEventListener("xaubeast:unlocked", startDashboard);
