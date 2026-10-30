@@ -68,16 +68,27 @@
         <label class="check"><input name="telegram_realtime" type="checkbox" /> Telegram instant push</label>
         <label>Order comment — Telegram (MT5)<input name="mt5_trade_comment" type="text" maxlength="31" /></label>
         <label>Order comment — WhatsApp (MT5)<input name="whatsapp_trade_comment" type="text" maxlength="31" /></label>
-        <label>Lot sizing
-          <select name="lot_mode">
+        <h3 class="settings-sub">Lots — Telegram (ABD / TE)</h3>
+        <label>Lot mode — Telegram
+          <select name="telegram_lot_mode">
             <option value="fixed">Fixed lot</option>
             <option value="risk_usd">Based on $ risk</option>
           </select>
         </label>
-        <label>Fixed MT5 lot<input name="volume" type="number" step="0.001" min="0.01" /></label>
-        <label>Risk per trade ($)<input name="risk_usd" type="number" step="1" min="1" /></label>
-        <p class="muted lot-hint">Telegram <code>SL</code> is always the XAU stop <strong>price</strong>. In $-risk mode: SL points = |live entry − SL price| ÷ MT5 point; lot ≈ risk_usd ÷ SL points. Same lot on all MT5 + Capiffy in parallel.</p>
-        <label>Capiffy lot size<input name="capiffy_volume" type="number" step="0.01" min="0.01" /></label>
+        <label>Fixed MT5 lot — Telegram<input name="telegram_volume" type="number" step="0.001" min="0.01" /></label>
+        <label>Risk per trade ($) — Telegram<input name="telegram_risk_usd" type="number" step="1" min="1" /></label>
+        <label>Capiffy lot — Telegram (fixed mode)<input name="telegram_capiffy_volume" type="number" step="0.01" min="0.01" /></label>
+        <h3 class="settings-sub">Lots — WhatsApp (WASIG)</h3>
+        <label>Lot mode — WhatsApp
+          <select name="whatsapp_lot_mode">
+            <option value="fixed">Fixed lot</option>
+            <option value="risk_usd">Based on $ risk</option>
+          </select>
+        </label>
+        <label>Fixed MT5 lot — WhatsApp<input name="whatsapp_volume" type="number" step="0.001" min="0.01" /></label>
+        <label>Risk per trade ($) — WhatsApp<input name="whatsapp_risk_usd" type="number" step="1" min="1" /></label>
+        <label>Capiffy lot — WhatsApp (fixed mode)<input name="whatsapp_capiffy_volume" type="number" step="0.01" min="0.01" /></label>
+        <p class="muted lot-hint">Signal <code>SL</code> is a stop <strong>price</strong>. In $-risk mode: SL points = |live entry − SL| ÷ MT5 <code>point</code>; lot ≈ risk ÷ (SL points × $1/point/lot on XAU). $-risk uses the same calculated lot on MT5 + Capiffy; fixed mode uses Capiffy lot above per source.</p>
         <label>Capiffy symbol<input name="capiffy_symbol" type="text" /></label>
         <label>Capiffy account id<input name="capiffy_account_id" type="text" /></label>
         <label class="check"><input name="news_calendar_enabled" type="checkbox" /> Red-folder news calendar</label>
@@ -105,6 +116,6 @@
   <div id="toast" class="toast hidden" role="status"></div>
   <script src="/static/auth.js?v=1"></script>
   <script src="/static/common.js?v=1"></script>
-  <script src="/static/settings.js?v=4"></script>
+  <script src="/static/settings.js?v=5"></script>
 </body>
 </html>

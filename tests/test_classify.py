@@ -39,6 +39,15 @@ class TestClassify(unittest.TestCase):
 
     def test_close_all(self):
         self.assertEqual(classify_text("Closing all.").kind, "close_all")
+        self.assertEqual(classify_text("Close all now.").kind, "close_all")
+        self.assertEqual(classify_text("CLOSE ALL NOW").kind, "close_all")
+        self.assertEqual(classify_text("Close all.").kind, "close_all")
+        self.assertEqual(classify_text("Close all positions now.").kind, "close_all")
+        self.assertEqual(classify_text("Close all positions now").kind, "close_all")
+        self.assertEqual(
+            classify_text("Team — CLOSE ALL positions now, book profit.").kind, "close_all"
+        )
+        self.assertEqual(classify_text("cLoSe AlL").kind, "close_all")
 
     def test_promo(self):
         t = "Join my VIP\nIB CODE: eqzbw05f6k\nDM @AbeidFX01"

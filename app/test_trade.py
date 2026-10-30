@@ -74,7 +74,7 @@ def test_market_open(cfg: dict, side: str, platform: str = "mt5") -> dict[str, A
             return {"ok": False, "error": "could not build trade plan for risk test"}
         try:
             mt5_vol, cap_vol, sizing = compute_trade_volumes(
-                eff, signal=signal, plan=plan, point=point
+                eff, source="telegram", signal=signal, plan=plan, point=point
             )
         except ValueError as exc:
             return {"ok": False, "error": str(exc)}

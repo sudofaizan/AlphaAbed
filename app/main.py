@@ -61,6 +61,15 @@ class ConfigUpdate(BaseModel):
     volume: Optional[float] = None
     lot_mode: Optional[str] = None
     risk_usd: Optional[float] = None
+    telegram_lot_mode: Optional[str] = None
+    telegram_volume: Optional[float] = None
+    telegram_risk_usd: Optional[float] = None
+    telegram_capiffy_volume: Optional[float] = None
+    whatsapp_lot_mode: Optional[str] = None
+    whatsapp_volume: Optional[float] = None
+    whatsapp_risk_usd: Optional[float] = None
+    whatsapp_capiffy_volume: Optional[float] = None
+    mt5_usd_per_point_per_lot: Optional[float] = None
     mt5_accounts: Optional[list[dict[str, Any]]] = None
     reward_risk_ratio: Optional[float] = None
     prefer_signal_tp: Optional[bool] = None
@@ -93,6 +102,7 @@ class ConfigUpdate(BaseModel):
 
 class PreviewBody(BaseModel):
     text: str
+    source: Optional[str] = None  # telegram | whatsapp
 
 
 class LoginBody(BaseModel):
@@ -421,8 +431,10 @@ async def api_events():
 async def api_preview(body: PreviewBody):
     cfg = load_config()
     from signals.classify import classify_text, format_signal_line
+    from signals.whatsapp_classify import classify_whatsapp_text
 
-    parsed = classify_text(body.text)
+    src = (body.source or "telegram").lower()
+    parsed = classify_whatsapp_text(body.text) if src == "whatsapp" else classify_text(body.text)
     out: dict[str, Any] = {
         "kind": parsed.kind,
         "summary": format_signal_line(parsed),
@@ -452,7 +464,7 @@ async def api_preview(body: PreviewBody):
                     out["sl_points"] = round(pts, 2)
                 try:
                     mt5_v, cap_v, sizing = compute_trade_volumes(
-                        cfg, signal=sig, plan=plan, point=point
+                        cfg, source=src, signal=sig, plan=plan, point=point
                     )
                     out["sizing"] = {**sizing, "mt5_volume": mt5_v, "capiffy_volume": cap_v}
                 except ValueError as exc:

@@ -7,7 +7,7 @@ from typing import Any
 
 from app.async_io import run_blocking
 from app.dual_trade import close_all_parallel, open_market_parallel, partial_close_all_mt5
-from app.lot_sizing import compute_trade_volumes
+from app.lot_sizing import compute_trade_volumes, lot_profile_for_source
 from app.mt5_accounts import primary_mt5_client
 from app.trade_dedupe import check_trade_cooldown, mark_trade_executed, reserve_trade_execution
 from signals.classify import TradeSignal, classify_text, merge_sl_fragment
@@ -89,7 +89,7 @@ def _process_signal_row_sync(row: dict[str, Any], cfg: dict) -> dict[str, Any] |
 
     if kind == "partial_close":
         mark_trade_executed()
-        vol = float(cfg["volume"]) / 2
+        vol = float(lot_profile_for_source(cfg, source)["volume"]) / 2
         return {
             "action": "partial_close",
             "result": partial_close_all_mt5(cfg, vol),
@@ -127,7 +127,7 @@ def _process_signal_row_sync(row: dict[str, Any], cfg: dict) -> dict[str, Any] |
 
     try:
         mt5_vol, cap_vol, sizing_meta = compute_trade_volumes(
-            cfg, signal=signal, plan=plan, point=point
+            cfg, source=source, signal=signal, plan=plan, point=point
         )
     except ValueError as exc:
         return {"action": "skipped", "reason": str(exc)}

@@ -83,10 +83,14 @@ function renderMt5AccountsList(accounts) {
 function renderCurrentSettings(cfg) {
   if (!cfg) return;
   const acctCount = (cfg.mt5_accounts || []).filter((a) => a.enabled !== false).length;
-  const lotLine =
-    (cfg.lot_mode || "fixed") === "risk_usd"
-      ? `$${cfg.risk_usd ?? 30} risk (÷ SL pts)`
-      : `Fixed ${cfg.volume ?? "—"}`;
+  const teLot =
+    (cfg.telegram_lot_mode || cfg.lot_mode || "fixed") === "risk_usd"
+      ? `TE $${cfg.telegram_risk_usd ?? cfg.risk_usd ?? 30} risk`
+      : `TE fixed ${cfg.telegram_volume ?? cfg.volume ?? "—"}`;
+  const waLot =
+    (cfg.whatsapp_lot_mode || "fixed") === "risk_usd"
+      ? `WA $${cfg.whatsapp_risk_usd ?? 30} risk`
+      : `WA fixed ${cfg.whatsapp_volume ?? "—"}`;
   const rows = [
     ["Telegram realtime", yn(cfg.telegram_realtime)],
     ["Poll interval (sec)", cfg.poll_interval_sec ?? "—"],
@@ -94,8 +98,10 @@ function renderCurrentSettings(cfg) {
     ["Auto-trade", yn(cfg.auto_trade)],
     ["Trade cooldown (sec)", cfg.trade_cooldown_sec ?? 300],
     ["MT5 accounts (enabled)", acctCount],
-    ["Lot sizing", lotLine],
-    ["Capiffy lot (fixed mode)", cfg.capiffy_volume ?? "—"],
+    ["Lot sizing — Telegram", teLot],
+    ["Lot sizing — WhatsApp", waLot],
+    ["Capiffy lot TE (fixed)", cfg.telegram_capiffy_volume ?? cfg.capiffy_volume ?? "—"],
+    ["Capiffy lot WA (fixed)", cfg.whatsapp_capiffy_volume ?? "—"],
     ["Follow Telegram", yn(cfg.telegram_enabled !== false)],
     ["Follow WhatsApp", yn(cfg.whatsapp_enabled)],
     ["WhatsApp URL", cfg.whatsapp_messages_url || "—"],

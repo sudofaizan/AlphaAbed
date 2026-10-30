@@ -73,7 +73,8 @@ _PROMO_MARKERS = (
     "partner-change",
 )
 
-_CLOSE = re.compile(r"^\s*(?:closing\s+all|close\s+all|closed)\.?\s*$", re.I)
+# Any case; extra text before/after is OK (e.g. "Close all positions now.").
+_CLOSE_PHRASE = re.compile(r"(?:closing\s+all|close\s+all)", re.I)
 _PARTIAL = re.compile(r"collect\s+partials", re.I)
 _ONLY_SL = re.compile(r"^\s*SL\s+\d+(?:\.\d+)?\s*$", re.I)
 
@@ -169,7 +170,7 @@ def classify_text(text: str) -> ParsedMessage:
     if not text:
         return ParsedMessage(kind="unknown", reason="empty", raw_text=text)
 
-    if _CLOSE.match(text):
+    if _CLOSE_PHRASE.search(text):
         return ParsedMessage(kind="close_all", reason="close instruction", raw_text=text)
 
     if _PARTIAL.search(text):
