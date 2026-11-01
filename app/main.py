@@ -38,6 +38,7 @@ from app.news_service import get_news_snapshot, refresh_news_sync
 from app.ui_auth import create_session, revoke_session, verify_password, verify_session
 from app.automation_pause import pause_automation, pause_status, resume_automation_now
 from app.past_trades import fetch_past_trades
+from app.range_wait import active_watches_snapshot
 from app.trade_dedupe import trade_cooldown_status
 from app.worker import refresh_history_once, worker_loop
 from signals.trade_plan import build_trade_plan
@@ -98,6 +99,12 @@ class ConfigUpdate(BaseModel):
     whatsapp_enabled: Optional[bool] = None
     whatsapp_messages_url: Optional[str] = None
     whatsapp_poll_sec: Optional[int] = None
+    range_wait_enabled: Optional[bool] = None
+    range_wait_timeout_sec: Optional[int] = None
+    range_poll_sec: Optional[int] = None
+    range_fade_enabled: Optional[bool] = None
+    range_fade_min_distance_points: Optional[int] = None
+    range_fade_lot_fraction: Optional[float] = None
 
 
 class PreviewBody(BaseModel):
@@ -239,6 +246,7 @@ async def api_status():
             "last_message_id": state.last_message_id,
             "config": cfg,
             "trade_cooldown": trade_cooldown_status(int(cfg.get("trade_cooldown_sec") or 0)),
+            "range_watches": active_watches_snapshot(),
             **news_blk,
             **pause,
         }

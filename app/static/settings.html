@@ -66,6 +66,14 @@
         <label>Poll interval (sec, if realtime off)<input name="poll_interval_sec" type="number" min="1" step="1" /></label>
         <label>Account / P&amp;L refresh (sec)<input name="account_refresh_sec" type="number" min="1" step="1" /></label>
         <label class="check"><input name="telegram_realtime" type="checkbox" /> Telegram instant push</label>
+        <h3 class="settings-sub">FROM range (no NOW) — wait for price</h3>
+        <label class="check"><input name="range_wait_enabled" type="checkbox" /> Wait up to 1h for price to enter FROM range (MT5 poll)</label>
+        <label>Range wait timeout (sec)<input name="range_wait_timeout_sec" type="number" min="60" max="86400" step="1" /></label>
+        <label>Range price poll (sec)<input name="range_poll_sec" type="number" min="1" max="60" step="1" /></label>
+        <label class="check"><input name="range_fade_enabled" type="checkbox" /> Fade + main leg (range &gt; 2000 pts away)</label>
+        <label>Min distance to range for fade (points)<input name="range_fade_min_distance_points" type="number" min="100" step="100" /></label>
+        <label>Fade lot fraction (0.5 = half of Telegram lot)<input name="range_fade_lot_fraction" type="number" min="0.01" max="1" step="0.05" /></label>
+        <p class="muted lot-hint">Example <code>BUY FROM 3935-3940</code>, spot far below: open <strong>half-lot SELL</strong> at once with <strong>Default SL (points)</strong> above; TP when price reaches the range (then close fade); when price is <em>inside</em> the range open the main <strong>BUY</strong>. Only if spot is more than 2000 MT5 points from the range. Capiffy on main fill only.</p>
         <label>Order comment — Telegram (MT5)<input name="mt5_trade_comment" type="text" maxlength="31" /></label>
         <label>Order comment — WhatsApp (MT5)<input name="whatsapp_trade_comment" type="text" maxlength="31" /></label>
         <h3 class="settings-sub">Lots — Telegram (ABD / TE)</h3>
@@ -116,6 +124,6 @@
   <div id="toast" class="toast hidden" role="status"></div>
   <script src="/static/auth.js?v=1"></script>
   <script src="/static/common.js?v=1"></script>
-  <script src="/static/settings.js?v=5"></script>
+  <script src="/static/settings.js?v=6"></script>
 </body>
 </html>

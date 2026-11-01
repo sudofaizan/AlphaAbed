@@ -123,7 +123,8 @@ def _parse_side_and_symbol(text: str) -> tuple[str | None, str | None]:
 def _parse_entry(text: str) -> tuple[float | None, float | None, float | None, bool]:
     rng = _RE_FROM_RANGE.search(text)
     if rng:
-        return None, float(rng.group(1)), float(rng.group(2)), False
+        a, b = float(rng.group(1)), float(rng.group(2))
+        return None, min(a, b), max(a, b), False
     for pat in (_RE_GOLD_AT, _RE_BUY_GOLD, _RE_AT):
         m = pat.search(text)
         if m:
@@ -141,8 +142,12 @@ def parse_trade_signal(text: str) -> TradeSignal | None:
         symbol = "XAUUSD"
     if not side or not symbol:
         return None
-    # Entry / NOW / AT / FROM are parsed for display only; execution is always market.
-    entry, entry_min, entry_max, _ = _parse_entry(text)
+    entry, entry_min, entry_max, wants_now = _parse_entry(text)
+    has_range = entry_min is not None and entry_max is not None
+    if has_range and not wants_now:
+        market = False
+    else:
+        market = wants_now or entry is not None or not has_range
     return TradeSignal(
         side=side,
         symbol=symbol,
@@ -151,7 +156,7 @@ def parse_trade_signal(text: str) -> TradeSignal | None:
         entry_max=entry_max,
         sl=sl,
         tp=tp,
-        market=True,
+        market=market,
     )
 
 

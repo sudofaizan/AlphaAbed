@@ -136,6 +136,12 @@ class AlphaFxClient:
             payload["magic"] = magic
         return self._request("POST", "/placeOrder", body=payload)
 
+    def get_positions(self, symbol: str | None = None) -> dict:
+        query: dict[str, str] = {}
+        if symbol:
+            query["symbol"] = symbol
+        return self._request("GET", "/getPositions", query=query or None)
+
     def close_all(self, symbol: str | None = None, *, comment: str = "ABD") -> dict:
         body: dict = {"comment": comment}
         if symbol:

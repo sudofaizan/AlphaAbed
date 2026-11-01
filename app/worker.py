@@ -17,7 +17,9 @@ from app.telegram_service import (
 )
 from app.connectivity import record_mt5, record_telegram, record_whatsapp
 from app.execution_tags import summarize_trade_execution
+from app.range_wait import schedule_range_watch
 from app.trading import process_signal_row
+from signals.classify import TradeSignal
 from app.mt5_accounts import primary_mt5_client
 from app.signal_history import (
     enrich_row_trade_plan,
@@ -51,8 +53,28 @@ async def refresh_account_metrics(cfg: dict) -> None:
     record_mt5(ok, err, health if ok else None)
 
 
-async def _handle_row(row: dict, cfg: dict) -> None:
+async def _handle_row(row: dict, cfg: dict, stop_event: asyncio.Event) -> None:
     trade = await process_signal_row(row, cfg)
+    if trade and trade.get("action") == "range_wait_pending":
+        sig_d = row.get("signal") or {}
+        signal = TradeSignal(
+            side=sig_d.get("side") or trade.get("side") or "buy",
+            symbol=sig_d.get("symbol") or "XAUUSD",
+            entry=sig_d.get("entry"),
+            entry_min=sig_d.get("entry_min"),
+            entry_max=sig_d.get("entry_max"),
+            sl=sig_d.get("sl"),
+            tp=sig_d.get("tp"),
+            tp_levels=sig_d.get("tp_levels"),
+            market=bool(sig_d.get("market", False)),
+        )
+        rw = schedule_range_watch(row, load_config(), signal, stop_event)
+        row["range_wait"] = rw
+        row["history_note"] = (
+            f"Waiting for price in {trade.get('range_lo')}-{trade.get('range_hi')} "
+            f"(up to {int(load_config().get('range_wait_timeout_sec') or 3600)}s)"
+        )
+        trade = rw
     if trade and trade.get("action") in ("open", "close_all", "partial_close"):
         row["execution"] = summarize_trade_execution(trade, cfg)
     elif trade and trade.get("action") == "skipped" and trade.get("reason") == "auto_trade disabled":
@@ -110,7 +132,7 @@ async def whatsapp_poll_loop(stop_event: asyncio.Event) -> None:
             if result.get("ok"):
                 record_whatsapp(True, None, result.get("channel"))
                 for row in result.get("rows") or []:
-                    await _handle_row(row, load_config())
+                    await _handle_row(row, load_config(), stop_event)
             else:
                 record_whatsapp(False, result.get("error"))
         except Exception as exc:
@@ -131,7 +153,7 @@ async def worker_loop(stop_event: asyncio.Event) -> None:
             return
         if not cfg.get("telegram_enabled", True):
             return
-        await _handle_row(row, cfg)
+        await _handle_row(row, cfg, stop_event)
         with state.lock:
             state.last_poll_at = datetime.now(timezone.utc).isoformat()
         record_telegram(True, None)

@@ -9,6 +9,7 @@ from app.async_io import run_blocking
 from app.dual_trade import close_all_parallel, open_market_parallel, partial_close_all_mt5
 from app.lot_sizing import compute_trade_volumes, lot_profile_for_source
 from app.mt5_accounts import primary_mt5_client
+from app.range_wait import cancel_all_watches, telegram_range_wait_needed
 from app.trade_dedupe import check_trade_cooldown, mark_trade_executed, reserve_trade_execution
 from signals.classify import TradeSignal, classify_text, merge_sl_fragment
 from signals.trade_plan import build_trade_plan
@@ -84,6 +85,7 @@ def _process_signal_row_sync(row: dict[str, Any], cfg: dict) -> dict[str, Any] |
     client = primary_mt5_client(cfg)
 
     if kind == "close_all":
+        cancel_all_watches()
         mark_trade_executed()
         return {"action": "close_all", "result": close_all_parallel(cfg)}
 
@@ -101,6 +103,20 @@ def _process_signal_row_sync(row: dict[str, Any], cfg: dict) -> dict[str, Any] |
     signal = parsed.signal
     if signal.sl is None and not cfg.get("default_sl_points"):
         return {"action": "skipped", "reason": "no SL in message and no default_sl_points"}
+
+    if telegram_range_wait_needed(source, signal, row.get("raw_text", ""), cfg):
+        lo = min(signal.entry_min or 0, signal.entry_max or 0)
+        hi = max(signal.entry_min or 0, signal.entry_max or 0)
+        return {
+            "action": "range_wait_pending",
+            "kind": kind,
+            "message_id": row.get("message_id"),
+            "source": source,
+            "range_lo": lo,
+            "range_hi": hi,
+            "side": signal.side,
+            "reason": f"waiting for {signal.side} entry in {lo}-{hi} (no NOW in signal)",
+        }
 
     price = client.get_price()
     if not price.get("ok"):
